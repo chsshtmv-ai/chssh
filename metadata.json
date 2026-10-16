@@ -1,0 +1,6 @@
+{
+  "name": "Contemporary Horizons in Social Sciences and Humanities",
+  "description": "Peer-reviewed, open-access international journal publishing rigorous scholarship across social theory, digital humanities, and cultural studies.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
