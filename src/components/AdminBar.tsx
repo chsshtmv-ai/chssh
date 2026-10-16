@@ -35,7 +35,7 @@ export const AdminBar: React.FC = () => {
   return (
     <aside
       aria-label="Admin Control Bar"
-      className="bg-stone-900 text-stone-100 border-b border-stone-800 px-4 py-2 text-xs sticky top-0 z-50 shadow-md flex flex-wrap items-center justify-between gap-3"
+      className="bg-stone-900 text-stone-100 border-b border-stone-800 px-4 py-2 text-xs relative z-50 shadow-md flex flex-wrap items-center justify-between gap-3"
     >
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/80 font-medium">
