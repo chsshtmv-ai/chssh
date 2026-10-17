@@ -177,102 +177,112 @@ export const ReviewersView: React.FC = () => {
         )}
       </div>
 
-      {/* Reviewer Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredReviewers.map((reviewer) => {
-          const initials = getInitials(reviewer.name);
-          const avatarColor = getAvatarColor(reviewer.name);
-
-          return (
-            <div
-              key={reviewer.id}
-              className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-5 shadow-2xs hover:shadow-sm transition-all space-y-3 flex flex-col justify-between"
-            >
-              <div className="space-y-3">
-                <div className="flex items-start gap-3.5">
-                  {reviewer.imageUrl ? (
-                    <img
-                      src={reviewer.imageUrl}
-                      alt={reviewer.name}
-                      className="w-12 h-12 rounded-full object-cover border border-slate-200 dark:border-stone-700 shrink-0"
-                    />
-                  ) : (
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-serif font-bold text-sm shrink-0 ${avatarColor}`}
-                    >
-                      {initials}
-                    </div>
-                  )}
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-serif font-semibold text-slate-900 dark:text-slate-100 text-base">
-                        {reviewer.name}
-                      </h3>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                        Accredited
-                      </span>
-                    </div>
-                    {reviewer.title && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                        {reviewer.title}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 mt-1">
-                      <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">{reviewer.affiliation}</span>
-                    </div>
-                    {reviewer.country && (
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                        <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{reviewer.country}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {reviewer.track && (
-                  <div className="text-[11px] font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-stone-800/60 px-2.5 py-1 rounded border border-slate-200/60 dark:border-stone-700/60">
-                    Track: <span className="font-semibold">{reviewer.track}</span>
-                  </div>
-                )}
-
-                {reviewer.expertise && (
-                  <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">Expertise: </span>
-                    {reviewer.expertise}
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 dark:border-stone-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-                {reviewer.orcid ? (
-                  <a
-                    href={reviewer.orcid.startsWith('http') ? reviewer.orcid : `https://orcid.org/${reviewer.orcid}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[#a6ce39] hover:underline font-mono text-[11px]"
-                  >
-                    <span>ORCID: {reviewer.orcid.replace('https://orcid.org/', '')}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                ) : (
-                  <span className="text-[11px] font-mono text-slate-400">CHSSH Peer College</span>
-                )}
-                {reviewer.email && (
-                  <span className="text-[11px] text-slate-400">Verified Scholar</span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {filteredReviewers.length === 0 && (
+      {/* Reviewer Cards Grid or Honest Empty State */}
+      {acceptedReviewers.length === 0 ? (
+        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
+          <GraduationCap className="w-10 h-10 mx-auto text-stone-400" />
+          <h4 className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">
+            Reviewer information will be updated soon.
+          </h4>
+          <p className="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto">
+            Accredited peer reviewers appointed by the Editorial Board will be listed here.
+          </p>
+        </div>
+      ) : filteredReviewers.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 text-slate-500 dark:text-slate-400 space-y-2">
           <p className="font-serif text-lg">No reviewers found matching your filter criteria.</p>
           <p className="text-xs">Try adjusting your search keywords or track selection.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {filteredReviewers.map((reviewer) => {
+            const initials = getInitials(reviewer.name);
+            const avatarColor = getAvatarColor(reviewer.name);
+
+            return (
+              <div
+                key={reviewer.id}
+                className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-5 shadow-2xs hover:shadow-sm transition-all space-y-3 flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3.5">
+                    {reviewer.imageUrl ? (
+                      <img
+                        src={reviewer.imageUrl}
+                        alt={reviewer.name}
+                        className="w-12 h-12 rounded-full object-cover border border-slate-200 dark:border-stone-700 shrink-0"
+                      />
+                    ) : (
+                      <div
+                        className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-serif font-bold text-sm shrink-0 ${avatarColor}`}
+                      >
+                        {initials}
+                      </div>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-serif font-semibold text-slate-900 dark:text-slate-100 text-base">
+                          {reviewer.name}
+                        </h3>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/60">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                          Accredited
+                        </span>
+                      </div>
+                      {reviewer.title && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                          {reviewer.title}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 mt-1">
+                        <Building className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate">{reviewer.affiliation}</span>
+                      </div>
+                      {reviewer.country && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                          <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{reviewer.country}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {reviewer.track && (
+                    <div className="text-[11px] font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-stone-800/60 px-2.5 py-1 rounded border border-slate-200/60 dark:border-stone-700/60">
+                      Track: <span className="font-semibold">{reviewer.track}</span>
+                    </div>
+                  )}
+
+                  {reviewer.expertise && (
+                    <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">Expertise: </span>
+                      {reviewer.expertise}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 dark:border-stone-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                  {reviewer.orcid ? (
+                    <a
+                      href={reviewer.orcid.startsWith('http') ? reviewer.orcid : `https://orcid.org/${reviewer.orcid}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[#a6ce39] hover:underline font-mono text-[11px]"
+                    >
+                      <span>ORCID: {reviewer.orcid.replace('https://orcid.org/', '')}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ) : (
+                    <span className="text-[11px] font-mono text-slate-400">CHSSH Peer College</span>
+                  )}
+                  {reviewer.email && (
+                    <span className="text-[11px] text-slate-400">Verified Scholar</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

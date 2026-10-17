@@ -310,84 +310,96 @@ export const HomeHero: React.FC = () => {
         </div>
 
         {/* Articles List */}
-        <div className="space-y-4">
-          {displayedArticles.map((article, idx) => (
-            <motion.article
-              key={article.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: idx * 0.05 }}
-              whileHover={{ y: -2, transition: { duration: 0.15 } }}
-              className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-2xs hover:shadow-sm hover:border-[#1c355e]/30 dark:hover:border-sky-500/30 transition-all space-y-3 relative group"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="px-2.5 py-0.5 rounded bg-blue-50 dark:bg-[#102344]/80 text-[#1c355e] dark:text-sky-300 text-xs font-semibold border border-blue-200 dark:border-sky-900">
-                  {article.track}
-                </span>
-                
-                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-mono flex-wrap">
-                  <span>Pages {article.pages}</span>
-                  {article.doi && (
-                    <>
-                      <span> </span>
-                      <ArticleDoiBadge doi={article.doi} size="sm" variant="badge" />
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <h3
-                onClick={() => setSelectedArticleForView(article)}
-                className="font-serif text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 group-hover:text-[#1c355e] dark:group-hover:text-sky-300 transition-colors cursor-pointer leading-snug"
+        {publishedArticles.length === 0 ? (
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 p-12 text-center space-y-3">
+            <BookOpen className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500" />
+            <h3 className="font-serif text-lg font-bold text-slate-800 dark:text-slate-200">
+              No papers have been published yet.
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+              Peer-reviewed manuscripts approved by the editorial office will appear here upon publication.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {displayedArticles.map((article, idx) => (
+              <motion.article
+                key={article.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: idx * 0.05 }}
+                whileHover={{ y: -2, transition: { duration: 0.15 } }}
+                className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 p-5 sm:p-6 shadow-2xs hover:shadow-sm hover:border-[#1c355e]/30 dark:hover:border-sky-500/30 transition-all space-y-3 relative group"
               >
-                {article.title}
-              </h3>
-
-              <div className="text-xs text-slate-600 dark:text-slate-400">
-                <strong className="text-slate-800 dark:text-slate-200">Authors:</strong>{' '}
-                {article.authors.map((a, i) => (
-                  <span key={a.id} className="mr-2">
-                    {a.name} <span className="text-slate-400 dark:text-slate-500">({a.affiliation}, {a.country})</span>
-                    {i < article.authors.length - 1 ? ';' : ''}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="px-2.5 py-0.5 rounded bg-blue-50 dark:bg-[#102344]/80 text-[#1c355e] dark:text-sky-300 text-xs font-semibold border border-blue-200 dark:border-sky-900">
+                    {article.track}
                   </span>
-                ))}
-              </div>
+                  
+                  <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-mono flex-wrap">
+                    <span>Pages {article.pages}</span>
+                    {article.doi && (
+                      <>
+                        <span> </span>
+                        <ArticleDoiBadge doi={article.doi} size="sm" variant="badge" />
+                      </>
+                    )}
+                  </div>
+                </div>
 
-              <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-serif leading-relaxed line-clamp-3 text-justify">
-                {article.abstract}
-              </p>
+                <h3
+                  onClick={() => setSelectedArticleForView(article)}
+                  className="font-serif text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 group-hover:text-[#1c355e] dark:group-hover:text-sky-300 transition-colors cursor-pointer leading-snug"
+                >
+                  {article.title}
+                </h3>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                <div className="flex flex-wrap gap-1.5">
-                  {article.keywords.slice(0, 4).map((kw, i) => (
-                    <span key={i} className="text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-0.5 rounded font-sans border border-slate-200/50 dark:border-slate-750">
-                      {kw}
+                <div className="text-xs text-slate-600 dark:text-slate-400">
+                  <strong className="text-slate-800 dark:text-slate-200">Authors:</strong>{' '}
+                  {article.authors.map((a, i) => (
+                    <span key={a.id} className="mr-2">
+                      {a.name} <span className="text-slate-400 dark:text-slate-500">({a.affiliation}, {a.country})</span>
+                      {i < article.authors.length - 1 ? ';' : ''}
                     </span>
                   ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedArticleForView(article)}
-                    className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-200/60 dark:border-slate-700"
-                  >
-                    <EditableText id="article_btn_read_cite" placeholder="Read Abstract & Cite" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedArticleForView(article)}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#1c355e] hover:bg-[#102344] dark:bg-[#23467d] dark:hover:bg-[#1c355e] text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5 text-sky-200" />
-                    <span>
-                      <EditableText id="article_btn_download_pdf" placeholder="Download PDF" />
-                    </span>
-                  </button>
+
+                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-serif leading-relaxed line-clamp-3 text-justify">
+                  {article.abstract}
+                </p>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex flex-wrap gap-1.5">
+                    {article.keywords.slice(0, 4).map((kw, i) => (
+                      <span key={i} className="text-[11px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2.5 py-0.5 rounded font-sans border border-slate-200/50 dark:border-slate-750">
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedArticleForView(article)}
+                      className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-200/60 dark:border-slate-700"
+                    >
+                      <EditableText id="article_btn_read_cite" placeholder="Read Abstract & Cite" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedArticleForView(article)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#1c355e] hover:bg-[#102344] dark:bg-[#23467d] dark:hover:bg-[#1c355e] text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5 text-sky-200" />
+                      <span>
+                        <EditableText id="article_btn_download_pdf" placeholder="Download PDF" />
+                      </span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </motion.article>
-          ))}
-        </div>
+              </motion.article>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* Indexing & Academic Partners Section */}

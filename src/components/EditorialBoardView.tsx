@@ -109,63 +109,75 @@ export const EditorialBoardView: React.FC = () => {
             <EditableText id="editorial_members_sub" placeholder="Double-Blind Evaluators" />
           </span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {editorialBoard.map((member, idx) => {
-            const colors = getAvatarColor(member.name);
-            const initials = getInitials(member.name);
-            return (
-              <motion.div
-                key={member.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: idx * 0.04 }}
-                whileHover={{ y: -2, transition: { duration: 0.15 } }}
-                className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-5 shadow-2xs space-y-3 hover:shadow-xs hover:border-[#1c355e]/40 dark:hover:border-sky-500/40 transition-all"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="relative shrink-0">
-                    {member.imageUrl ? (
-                      <img
-                        src={member.imageUrl}
-                        alt={member.name}
-                        referrerPolicy="no-referrer"
-                        className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl object-cover border-2 border-[#1c355e]/25 dark:border-sky-500/35 shadow-xs bg-stone-100 dark:bg-stone-800"
-                      />
-                    ) : (
-                      <div
-                        className={`w-16 h-16 sm:w-18 sm:h-18 rounded-xl flex flex-col items-center justify-center font-serif font-bold text-lg border ${colors.bg} ${colors.text} ${colors.border} shadow-2xs`}
-                      >
-                        <span>{initials}</span>
-                        <span className="text-[9px] uppercase tracking-tighter opacity-70 font-sans font-medium">Board</span>
+        {editorialBoard.length === 0 ? (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
+            <ShieldCheck className="w-10 h-10 mx-auto text-stone-400" />
+            <h4 className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">
+              Editorial Board information will be updated soon.
+            </h4>
+            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto">
+              Official editorial appointments approved by the journal council will appear here once published.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {editorialBoard.map((member, idx) => {
+              const colors = getAvatarColor(member.name);
+              const initials = getInitials(member.name);
+              return (
+                <motion.div
+                  key={member.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: idx * 0.04 }}
+                  whileHover={{ y: -2, transition: { duration: 0.15 } }}
+                  className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-5 shadow-2xs space-y-3 hover:shadow-xs hover:border-[#1c355e]/40 dark:hover:border-sky-500/40 transition-all"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="relative shrink-0">
+                      {member.imageUrl ? (
+                        <img
+                          src={member.imageUrl}
+                          alt={member.name}
+                          referrerPolicy="no-referrer"
+                          className="w-16 h-16 sm:w-18 sm:h-18 rounded-xl object-cover border-2 border-[#1c355e]/25 dark:border-sky-500/35 shadow-xs bg-stone-100 dark:bg-stone-800"
+                        />
+                      ) : (
+                        <div
+                          className={`w-16 h-16 sm:w-18 sm:h-18 rounded-xl flex flex-col items-center justify-center font-serif font-bold text-lg border ${colors.bg} ${colors.text} ${colors.border} shadow-2xs`}
+                        >
+                          <span>{initials}</span>
+                          <span className="text-[9px] uppercase tracking-tighter opacity-70 font-sans font-medium">Board</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-1 flex-1">
+                      <h4 className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
+                        {member.name}
+                      </h4>
+                      <div className="text-xs font-semibold text-[#1c355e] dark:text-sky-400">
+                        {member.role}
                       </div>
-                    )}
-                  </div>
-                  <div className="space-y-1 flex-1">
-                    <h4 className="font-serif text-lg font-bold text-stone-900 dark:text-stone-100">
-                      {member.name}
-                    </h4>
-                    <div className="text-xs font-semibold text-[#1c355e] dark:text-sky-400">
-                      {member.role}
-                    </div>
-                    <div className="text-xs text-stone-700 dark:text-stone-300 font-sans">
-                      <strong className="text-stone-800 dark:text-stone-200">Institution:</strong> {member.affiliation}, {member.country}
+                      <div className="text-xs text-stone-700 dark:text-stone-300 font-sans">
+                        <strong className="text-stone-800 dark:text-stone-200">Institution:</strong> {member.affiliation}, {member.country}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="text-xs text-stone-600 dark:text-stone-300 bg-stone-50 dark:bg-stone-850 p-3 rounded-lg border border-stone-200/70 dark:border-stone-800 leading-relaxed font-sans">
-                  <span className="font-semibold text-stone-800 dark:text-stone-200">Field &amp; Expertise: </span>
-                  {member.expertise}
-                </div>
-                {member.email && (
-                  <div className="text-[11px] text-stone-500 dark:text-stone-400 font-mono pt-1 flex items-center gap-1.5">
-                    <Mail className="w-3 h-3 text-stone-400 dark:text-stone-500" />
-                    <span>{member.email}</span>
+                  <div className="text-xs text-stone-600 dark:text-stone-300 bg-stone-50 dark:bg-stone-850 p-3 rounded-lg border border-stone-200/70 dark:border-stone-800 leading-relaxed font-sans">
+                    <span className="font-semibold text-stone-800 dark:text-stone-200">Field &amp; Expertise: </span>
+                    {member.expertise}
                   </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </div>
+                  {member.email && (
+                    <div className="text-[11px] text-stone-500 dark:text-stone-400 font-mono pt-1 flex items-center gap-1.5">
+                      <Mail className="w-3 h-3 text-stone-400 dark:text-stone-500" />
+                      <span>{member.email}</span>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Advisory Board Callout Card */}

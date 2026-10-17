@@ -4,7 +4,6 @@ import { EditableText } from './EditableText';
 import { ArticleDoiBadge } from './ArticleDoiBadge';
 import { printPublicationCertificate, triggerFileDownload } from '../utils/downloadGenerators';
 import { getAssetFile } from '../utils/fileStorage';
-import { generateCoverPagePdf } from '../utils/pdfGenerators';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { JournalUploadedAsset } from '../types';
 import { getFreshPdfUrl } from '../services/pdfStorageService';
@@ -66,10 +65,14 @@ export const CurrentIssue: React.FC = () => {
       )
     : currentArticles;
 
+  const hasGenuineCover = Boolean(
+    coverAsset?.isUploaded &&
+    (coverAsset?.downloadURL || coverAsset?.fileUrl || coverAsset?.fileDataUrl)
+  );
+
   const handlePreviewCover = async () => {
     setIsLoadingCover(true);
     try {
-      // 1. Fetch latest active PDF directly from Firebase/Firestore
       let current = coverAsset;
       try {
         const fresh = await fetchActivePdf('cover_page');
@@ -78,7 +81,6 @@ export const CurrentIssue: React.FC = () => {
         console.warn('Note on fetching latest PDF from Firebase:', err);
       }
 
-      // 2. Check for active Firebase Storage download URL
       const effectiveUrl = current?.downloadURL || current?.fileUrl || current?.fileDataUrl;
       let finalUrl = effectiveUrl;
 
@@ -86,9 +88,9 @@ export const CurrentIssue: React.FC = () => {
         finalUrl = (await getAssetFile('cover_page')) || undefined;
       }
 
-      // 3. Only fall back to template generator if genuinely no active PDF exists
       if (!finalUrl) {
-        finalUrl = generateCoverPagePdf(content);
+        alert('No official cover document has been uploaded yet.');
+        return;
       }
 
       setPreviewCoverAsset({
@@ -101,14 +103,13 @@ export const CurrentIssue: React.FC = () => {
         fileType: current?.fileType || 'application/pdf',
         downloadURL: current?.downloadURL,
         fileUrl: current?.downloadURL || current?.fileUrl,
-        fileDataUrl: finalUrl ? (finalUrl.startsWith('http') ? getFreshPdfUrl(finalUrl) : finalUrl) : undefined,
+        fileDataUrl: finalUrl.startsWith('http') ? getFreshPdfUrl(finalUrl) : finalUrl,
         uploadedAt: current?.uploadedAt || new Date().toISOString(),
-        isUploaded: Boolean(current?.isUploaded || current?.downloadURL)
+        isUploaded: true
       });
       setIsCoverPreviewOpen(true);
     } catch (err) {
       console.error('Error opening cover preview:', err);
-      alert('Unable to load the latest PDF. Please try again.');
     } finally {
       setIsLoadingCover(false);
     }
@@ -133,15 +134,14 @@ export const CurrentIssue: React.FC = () => {
         return;
       }
 
-      let localUrl = (await getAssetFile('cover_page')) || undefined;
-      if (!localUrl) {
-        localUrl = generateCoverPagePdf(content);
+      const localUrl = (await getAssetFile('cover_page')) || undefined;
+      if (localUrl) {
+        triggerFileDownload(
+          localUrl,
+          current?.fileName || 'CHSSH_Volume_7_Cover.pdf',
+          current?.fileType || 'application/pdf'
+        );
       }
-      triggerFileDownload(
-        localUrl,
-        current?.fileName || 'CHSSH_Volume_7_Cover.pdf',
-        current?.fileType || 'application/pdf'
-      );
     } finally {
       setTimeout(() => setIsDownloadingCover(false), 1000);
     }
@@ -234,53 +234,72 @@ export const CurrentIssue: React.FC = () => {
                   </div>
                 )}
 
-                <div className="pt-1 flex flex-col gap-1.5">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={handlePreviewCover}
-                      disabled={isLoadingCover}
-                      className="flex-1 py-1 px-2 rounded text-[11px] font-semibold bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 flex items-center justify-center gap-1 cursor-pointer transition disabled:opacity-50"
-                      title="Preview official cover document"
-                    >
-                      {isLoadingCover ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin text-sky-300" />
-                          <span>Loading latest PDF...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="w-3 h-3" />
-                          <span>Preview</span>
-                        </>
-                      )}
-                    </button>
+                {hasGenuineCover ? (
+                  <div className="pt-1 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handlePreviewCover}
+                        disabled={isLoadingCover}
+                        className="flex-1 py-1 px-2 rounded text-[11px] font-semibold bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 flex items-center justify-center gap-1 cursor-pointer transition disabled:opacity-50"
+                        title="Preview official cover document"
+                      >
+                        {isLoadingCover ? (
+                          <>
+                            <Loader2 className="w-3 h-3 animate-spin text-sky-300" />
+                            <span>Loading PDF...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3 h-3" />
+                            <span>Preview</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDownloadCover}
+                        disabled={isDownloadingCover}
+                        className="flex-1 py-1 px-2 rounded text-[11px] font-semibold bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-400/30 flex items-center justify-center gap-1 cursor-pointer transition"
+                        title="Download official cover document"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>{isDownloadingCover ? '...' : 'Download'}</span>
+                      </button>
+                    </div>
 
                     <button
                       type="button"
-                      onClick={handleDownloadCover}
-                      disabled={isDownloadingCover}
-                      className="flex-1 py-1 px-2 rounded text-[11px] font-semibold bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-400/30 flex items-center justify-center gap-1 cursor-pointer transition"
-                      title="Download official cover document"
+                      onClick={() => {
+                        setActiveTab('admin');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="w-full py-0.5 px-1.5 rounded text-[10px] text-slate-400 hover:text-white hover:bg-white/5 flex items-center justify-center gap-1 cursor-pointer transition"
+                      title="Manage journal documents in Admin CMS"
                     >
-                      <Download className="w-3 h-3" />
-                      <span>{isDownloadingCover ? '...' : 'Download'}</span>
+                      <Upload className="w-2.5 h-2.5 text-amber-400" />
+                      <span>Manage in CMS</span>
                     </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveTab('admin');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="w-full py-0.5 px-1.5 rounded text-[10px] text-slate-400 hover:text-white hover:bg-white/5 flex items-center justify-center gap-1 cursor-pointer transition"
-                    title="Upload or manage official journal documents in Admin Panel"
-                  >
-                    <Upload className="w-2.5 h-2.5 text-amber-400" />
-                    <span>Manage in CMS</span>
-                  </button>
-                </div>
+                ) : (
+                  <div className="pt-1 text-[11px] text-slate-300 font-serif italic py-1">
+                    Cover in preparation by editorial office
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('admin');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="w-full mt-2 py-1 px-2 rounded text-[10px] bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 flex items-center justify-center gap-1 cursor-pointer transition"
+                      >
+                        <Upload className="w-2.5 h-2.5 text-amber-400" />
+                        <span>Upload Cover in CMS</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -311,94 +330,116 @@ export const CurrentIssue: React.FC = () => {
           </div>
         </div>
 
-        {/* Article Cards */}
-        <div className="space-y-4">
-          {filteredArticles.map((article, idx) => (
-            <motion.article
-              key={article.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-5 sm:p-6 shadow-2xs hover:shadow-sm transition-all space-y-3"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="font-semibold text-[#1c355e] dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 rounded-full border border-sky-200/60 dark:border-sky-800/60 text-[11px]">
-                  {article.track}
-                </span>
-                <span className="text-stone-500 font-mono text-[11px]">
-                  Pages: {article.pages || '1–24'} | Vol. {article.volume || 7}, No. {article.issue || 1}
-                </span>
-              </div>
-
-              <h2
-                onClick={() => setSelectedArticleForView(article)}
-                className="font-serif text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 hover:text-[#1c355e] dark:hover:text-sky-400 cursor-pointer transition-colors"
+        {/* Article Cards or Empty State */}
+        {currentArticles.length === 0 ? (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
+            <BookOpen className="w-10 h-10 mx-auto text-stone-400" />
+            <h4 className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">
+              No papers have been published yet.
+            </h4>
+            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto">
+              Peer-reviewed manuscripts approved by the editorial office will appear here upon publication.
+            </p>
+          </div>
+        ) : filteredArticles.length === 0 ? (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
+            <Search className="w-8 h-8 text-stone-300 dark:text-stone-600 mx-auto" />
+            <div className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">
+              No articles match your search criteria.
+            </div>
+            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-sm mx-auto">
+              Try adjusting your search query or clear the filter.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredArticles.map((article, idx) => (
+              <motion.article
+                key={article.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-5 sm:p-6 shadow-2xs hover:shadow-sm transition-all space-y-3"
               >
-                {article.title}
-              </h2>
-
-              <p className="text-xs font-serif text-stone-600 dark:text-stone-300">
-                By: {article.authors.map((a) => a.name).join(', ')} ({article.authors[0]?.affiliation})
-              </p>
-
-              <p className="text-xs text-stone-600 dark:text-stone-300 line-clamp-3 leading-relaxed">
-                {article.abstract}
-              </p>
-
-              <div className="pt-3 border-t border-stone-100 dark:border-stone-800/80 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  {article.doi && <ArticleDoiBadge doi={article.doi} />}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="font-semibold text-[#1c355e] dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 rounded-full border border-sky-200/60 dark:border-sky-800/60 text-[11px]">
+                    {article.track}
+                  </span>
+                  <span className="text-stone-500 font-mono text-[11px]">
+                    Pages: {article.pages || '1–24'} | Vol. {article.volume || 7}, No. {article.issue || 1}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      requireAuthorAuth(() => {
-                        printPublicationCertificate(
-                          {
-                            authorName: article.authors.map((a) => a.name).join(', '),
-                            paperTitle: article.title,
-                            trackingId: article.trackingId,
-                            volume: article.volume ? String(article.volume) : undefined,
-                            issue: article.issue ? String(article.issue) : undefined,
-                            pages: article.pages,
-                            doi: article.doi,
-                            date: article.publishedDate || article.submissionDate
-                          },
-                          content,
-                          uploadedAssets?.['certificate_template']
-                        );
-                      }, 'Author Login Required: Please sign in with your User ID and Password to download this Certificate of Publication.');
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-800 hover:bg-sky-900 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                    title="Download author publication certificate with ISSN and Editor-in-Chief signature"
-                  >
-                    <Award className="w-3.5 h-3.5 text-sky-200" />
-                    <span>Certificate</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      requireAuthorAuth(() => {
-                        const success = downloadPublishedPaper(article);
-                        if (!success) {
-                          setSelectedArticleForView(article);
-                        }
-                      }, 'Author Login Required: Please sign in with your User ID and Password to download published research papers.');
-                    }}
-                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#1c355e] hover:bg-[#102344] text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                  >
-                    <Download className="w-3.5 h-3.5 text-sky-300" />
-                    <span>
-                      <EditableText id="article_btn_download_pdf" placeholder="Download PDF" />
-                    </span>
-                  </button>
+                <h2
+                  onClick={() => setSelectedArticleForView(article)}
+                  className="font-serif text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 hover:text-[#1c355e] dark:hover:text-sky-400 cursor-pointer transition-colors"
+                >
+                  {article.title}
+                </h2>
+
+                <p className="text-xs font-serif text-stone-600 dark:text-stone-300">
+                  By: {article.authors.map((a) => a.name).join(', ')} ({article.authors[0]?.affiliation})
+                </p>
+
+                <p className="text-xs text-stone-600 dark:text-stone-300 line-clamp-3 leading-relaxed">
+                  {article.abstract}
+                </p>
+
+                <div className="pt-3 border-t border-stone-100 dark:border-stone-800/80 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {article.doi && <ArticleDoiBadge doi={article.doi} />}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        requireAuthorAuth(() => {
+                          printPublicationCertificate(
+                            {
+                              authorName: article.authors.map((a) => a.name).join(', '),
+                              paperTitle: article.title,
+                              trackingId: article.trackingId,
+                              volume: article.volume ? String(article.volume) : undefined,
+                              issue: article.issue ? String(article.issue) : undefined,
+                              pages: article.pages,
+                              doi: article.doi,
+                              date: article.publishedDate || article.submissionDate
+                            },
+                            content,
+                            uploadedAssets?.['certificate_template']
+                          );
+                        }, 'Author Login Required: Please sign in with your User ID and Password to download this Certificate of Publication.');
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-800 hover:bg-sky-900 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                      title="Download author publication certificate with ISSN and Editor-in-Chief signature"
+                    >
+                      <Award className="w-3.5 h-3.5 text-sky-200" />
+                      <span>Certificate</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        requireAuthorAuth(() => {
+                          const success = downloadPublishedPaper(article);
+                          if (!success) {
+                            setSelectedArticleForView(article);
+                          }
+                        }, 'Author Login Required: Please sign in with your User ID and Password to download published research papers.');
+                      }}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#1c355e] hover:bg-[#102344] text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5 text-sky-300" />
+                      <span>
+                        <EditableText id="article_btn_download_pdf" placeholder="Download PDF" />
+                      </span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </motion.article>
-          ))}
-        </div>
+              </motion.article>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Cover Page Preview Modal */}

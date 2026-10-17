@@ -1,0 +1,156 @@
+{
+  "entities": {
+    "JournalContent": {
+      "title": "JournalContent",
+      "description": "General journal metadata, masthead text, and public configuration",
+      "type": "object",
+      "properties": {
+        "journal_name": { "type": "string" },
+        "journal_short_name": { "type": "string" },
+        "issn_online": { "type": "string" },
+        "issn_print": { "type": "string" },
+        "doi_prefix": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "Article": {
+      "title": "Article",
+      "description": "Manuscripts submitted and peer-reviewed articles published in CHSSH",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trackingId": { "type": "string" },
+        "title": { "type": "string" },
+        "abstract": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["submitted", "under_review", "revision_requested", "accepted", "published", "rejected"]
+        },
+        "track": { "type": "string" },
+        "submissionDate": { "type": "string" },
+        "publishedDate": { "type": "string" },
+        "volume": { "type": "number" },
+        "issue": { "type": "number" },
+        "doi": { "type": "string" }
+      },
+      "required": ["id", "trackingId", "title", "status"]
+    },
+    "EditorialMember": {
+      "title": "EditorialMember",
+      "description": "Editorial board members appointed by the journal leadership",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "affiliation": { "type": "string" },
+        "country": { "type": "string" },
+        "expertise": { "type": "string" }
+      },
+      "required": ["id", "name", "role", "affiliation"]
+    },
+    "AdvisoryBoardMember": {
+      "title": "AdvisoryBoardMember",
+      "description": "International advisory board members and scientific council",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "affiliation": { "type": "string" },
+        "country": { "type": "string" },
+        "expertise": { "type": "string" },
+        "category": {
+          "type": "string",
+          "enum": ["international", "scientific", "honorary", "policy"]
+        }
+      },
+      "required": ["id", "name", "role", "affiliation"]
+    },
+    "Reviewer": {
+      "title": "Reviewer",
+      "description": "Peer reviewer profiles and applications",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "affiliation": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "accepted", "rejected"]
+        },
+        "track": { "type": "string" },
+        "expertise": { "type": "string" },
+        "appliedDate": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "affiliation", "status"]
+    },
+    "JournalUploadedAsset": {
+      "title": "JournalUploadedAsset",
+      "description": "Admin uploaded downloadable documents and assets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "fileType": { "type": "string" },
+        "isUploaded": { "type": "boolean" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "fileName"]
+    },
+    "AuthorAccount": {
+      "title": "AuthorAccount",
+      "description": "Registered author account profiles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "affiliation": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "phone", "email"]
+    }
+  },
+  "firestore": {
+    "/journal_content/{contentId}": {
+      "schema": "JournalContent",
+      "description": "Journal text content and configuration document"
+    },
+    "/journal_assets/{assetId}": {
+      "schema": "JournalUploadedAsset",
+      "description": "Admin-uploaded and published downloadable files"
+    },
+    "/articles/{articleId}": {
+      "schema": "Article",
+      "description": "Submitted manuscripts and published articles"
+    },
+    "/editorial_board/{memberId}": {
+      "schema": "EditorialMember",
+      "description": "Editorial board members"
+    },
+    "/advisory_board/{memberId}": {
+      "schema": "AdvisoryBoardMember",
+      "description": "Advisory board members"
+    },
+    "/reviewers/{reviewerId}": {
+      "schema": "Reviewer",
+      "description": "Peer reviewer roster and applications"
+    },
+    "/author_accounts/{authorId}": {
+      "schema": "AuthorAccount",
+      "description": "Author user accounts"
+    },
+    "/app_settings/{settingId}": {
+      "schema": "JournalContent",
+      "description": "System security and theme settings"
+    }
+  }
+}

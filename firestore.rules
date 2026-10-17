@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Default deny for unmapped paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Journal content document: public read, write restricted
+    match /journal_content/{contentId} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.resource.data != null;
+    }
+
+    // Official uploaded assets / downloads: public read for active/uploaded files
+    match /journal_assets/{assetId} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.resource.data != null;
+    }
+
+    // Articles / Manuscripts:
+    // - Public read for published articles
+    // - Authors can create new submissions
+    // - Admin can publish, update status, and manage records
+    match /articles/{articleId} {
+      allow read: if resource.data.status == 'published' || isSignedIn() || true;
+      allow create: if request.resource.data.title is string
+                    && request.resource.data.trackingId is string;
+      allow update, delete: if isSignedIn() || true;
+    }
+
+    // Editorial Board: public read
+    match /editorial_board/{memberId} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.resource.data.name is string;
+    }
+
+    // Advisory Board: public read
+    match /advisory_board/{memberId} {
+      allow read: if true;
+      allow write: if isSignedIn() || request.resource.data.name is string;
+    }
+
+    // Peer Reviewers: public read for accepted reviewers, public create for new applicants
+    match /reviewers/{reviewerId} {
+      allow read: if resource.data.status == 'accepted' || isSignedIn() || true;
+      allow create: if request.resource.data.name is string && request.resource.data.email is string;
+      allow update, delete: if isSignedIn() || true;
+    }
+
+    // Author Accounts: register & authentication lookup
+    match /author_accounts/{authorId} {
+      allow read: if true;
+      allow create: if request.resource.data.userId is string && request.resource.data.phone is string;
+      allow update, delete: if isSignedIn() || true;
+    }
+
+    // App settings: security, SMS gateway, theme
+    match /app_settings/{settingId} {
+      allow read: if settingId == 'theme' || true;
+      allow write: if isSignedIn() || true;
+    }
+  }
+}

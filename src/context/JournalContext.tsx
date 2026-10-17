@@ -266,12 +266,14 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const saved = localStorage.getItem('chssh_articles');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: Article[] = JSON.parse(saved);
+        // Exclude legacy mock article IDs
+        return parsed.filter(a => !['art-1', 'art-2', 'art-3', 'art-4', 'art-5'].includes(a.id));
       }
     } catch (e) {
       console.error('Error loading local articles', e);
     }
-    return initialArticles;
+    return [];
   });
 
   const [editorialBoard, setEditorialBoard] = useState<EditorialMember[]>(() => {
@@ -283,31 +285,35 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {
       console.error('Error loading local editorial board', e);
     }
-    return initialEditorialBoard;
+    return [];
   });
 
   const [advisoryBoard, setAdvisoryBoard] = useState<AdvisoryBoardMember[]>(() => {
     try {
       const saved = localStorage.getItem('chssh_advisory_board');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: AdvisoryBoardMember[] = JSON.parse(saved);
+        // Exclude legacy mock advisory board IDs
+        return parsed.filter(m => !['adv-5', 'adv-6', 'adv-7', 'adv-8'].includes(m.id));
       }
     } catch (e) {
       console.error('Error loading local advisory board', e);
     }
-    return initialAdvisoryBoard;
+    return [];
   });
 
   const [reviewers, setReviewers] = useState<Reviewer[]>(() => {
     try {
       const saved = localStorage.getItem('chssh_reviewers');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: Reviewer[] = JSON.parse(saved);
+        // Exclude legacy mock reviewer IDs
+        return parsed.filter(r => !['rev-1', 'rev-2', 'rev-3', 'rev-4', 'rev-5', 'rev-6'].includes(r.id));
       }
     } catch (e) {
       console.error('Error loading local reviewers', e);
     }
-    return initialReviewers;
+    return [];
   });
 
   const [uploadedAssets, setUploadedAssets] = useState<Record<string, JournalUploadedAsset>>(() => {
@@ -319,7 +325,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {
       console.error('Error loading local uploaded assets', e);
     }
-    return initialJournalAssets;
+    return {};
   });
 
   const [adminPassword, setAdminPassword] = useState<string>(() => {
@@ -377,11 +383,14 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [authorAccounts, setAuthorAccounts] = useState<AuthorAccount[]>(() => {
     try {
       const saved = localStorage.getItem('chssh_author_accounts');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed: AuthorAccount[] = JSON.parse(saved);
+        return parsed.filter(a => !['author-elena', 'author-marcus', 'author-aisha'].includes(a.id));
+      }
     } catch (e) {
       console.error('Error loading local author accounts', e);
     }
-    return initialAuthors;
+    return [];
   });
 
   const [currentAuthor, setCurrentAuthor] = useState<AuthorAccount | null>(() => {
@@ -671,7 +680,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const articlesColRef = collection(db, 'articles');
       unsubscribeArticles = onSnapshot(
         articlesColRef,
-        async (snap) => {
+        (snap) => {
           if (!snap.empty) {
             const remoteArticles: Article[] = [];
             snap.forEach((docItem) => {
@@ -684,23 +693,11 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
               return dateB - dateA;
             });
             setArticles(remoteArticles);
-            setFirebaseStatus('connected');
-            setLastSyncedAt(new Date());
-          } else if (!isArticlesSeeded.current) {
-            isArticlesSeeded.current = true;
-            try {
-              const batch = writeBatch(db);
-              initialArticles.forEach((art) => {
-                const artRef = doc(db, 'articles', art.id);
-                batch.set(artRef, cleanForFirestore(art));
-              });
-              await batch.commit();
-              setFirebaseStatus('connected');
-              setLastSyncedAt(new Date());
-            } catch (err) {
-              console.warn('Seeding initial articles to Firestore:', err);
-            }
+          } else {
+            setArticles([]);
           }
+          setFirebaseStatus('connected');
+          setLastSyncedAt(new Date());
         },
         (error) => {
           console.warn('Firestore articles listener note:', error.message);
@@ -711,30 +708,18 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const editorialColRef = collection(db, 'editorial_board');
       unsubscribeEditorial = onSnapshot(
         editorialColRef,
-        async (snap) => {
+        (snap) => {
           if (!snap.empty) {
             const remoteMembers: EditorialMember[] = [];
             snap.forEach((docItem) => {
               remoteMembers.push(docItem.data() as EditorialMember);
             });
             setEditorialBoard(remoteMembers);
-            setFirebaseStatus('connected');
-            setLastSyncedAt(new Date());
-          } else if (!isEditorialSeeded.current) {
-            isEditorialSeeded.current = true;
-            try {
-              const batch = writeBatch(db);
-              initialEditorialBoard.forEach((mem) => {
-                const memRef = doc(db, 'editorial_board', mem.id);
-                batch.set(memRef, cleanForFirestore(mem));
-              });
-              await batch.commit();
-              setFirebaseStatus('connected');
-              setLastSyncedAt(new Date());
-            } catch (err) {
-              console.warn('Seeding initial editorial board to Firestore:', err);
-            }
+          } else {
+            setEditorialBoard([]);
           }
+          setFirebaseStatus('connected');
+          setLastSyncedAt(new Date());
         },
         (error) => {
           console.warn('Firestore editorial listener note:', error.message);
@@ -745,7 +730,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const advisoryColRef = collection(db, 'advisory_board');
       unsubscribeAdvisory = onSnapshot(
         advisoryColRef,
-        async (snap) => {
+        (snap) => {
           if (!snap.empty) {
             const remoteMembers: AdvisoryBoardMember[] = [];
             snap.forEach((docItem) => {
@@ -753,23 +738,11 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             remoteMembers.sort((a, b) => (a.order || 99) - (b.order || 99));
             setAdvisoryBoard(remoteMembers);
-            setFirebaseStatus('connected');
-            setLastSyncedAt(new Date());
-          } else if (!isAdvisorySeeded.current) {
-            isAdvisorySeeded.current = true;
-            try {
-              const batch = writeBatch(db);
-              initialAdvisoryBoard.forEach((mem) => {
-                const memRef = doc(db, 'advisory_board', mem.id);
-                batch.set(memRef, cleanForFirestore(mem));
-              });
-              await batch.commit();
-              setFirebaseStatus('connected');
-              setLastSyncedAt(new Date());
-            } catch (err) {
-              console.warn('Seeding initial advisory board to Firestore:', err);
-            }
+          } else {
+            setAdvisoryBoard([]);
           }
+          setFirebaseStatus('connected');
+          setLastSyncedAt(new Date());
         },
         (error) => {
           console.warn('Firestore advisory listener note:', error.message);
@@ -875,16 +848,6 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setFirebaseStatus('connected');
             setLastSyncedAt(new Date());
-          } else if (!isAssetsSeeded.current) {
-            isAssetsSeeded.current = true;
-            try {
-              await setDoc(assetsDocRef, {
-                assets: cleanForFirestore(initialJournalAssets),
-                updatedAt: new Date().toISOString()
-              });
-            } catch (err) {
-              console.warn('Seeding initial journal assets to Firestore:', err);
-            }
           }
         },
         (error) => {
@@ -916,6 +879,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
               return merged;
             });
             setFirebaseStatus('connected');
+          } else {
+            setUploadedAssets({});
           }
         },
         (error) => {
@@ -926,30 +891,18 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const reviewersColRef = collection(db, 'reviewers');
       unsubscribeReviewers = onSnapshot(
         reviewersColRef,
-        async (snap) => {
+        (snap) => {
           if (!snap.empty) {
             const remoteReviewers: Reviewer[] = [];
             snap.forEach((docItem) => {
               remoteReviewers.push(docItem.data() as Reviewer);
             });
             setReviewers(remoteReviewers);
-            setFirebaseStatus('connected');
-            setLastSyncedAt(new Date());
-          } else if (!isReviewersSeeded.current) {
-            isReviewersSeeded.current = true;
-            try {
-              const batch = writeBatch(db);
-              initialReviewers.forEach((rev) => {
-                const revRef = doc(db, 'reviewers', rev.id);
-                batch.set(revRef, cleanForFirestore(rev));
-              });
-              await batch.commit();
-              setFirebaseStatus('connected');
-              setLastSyncedAt(new Date());
-            } catch (err) {
-              console.warn('Seeding initial reviewers to Firestore:', err);
-            }
+          } else {
+            setReviewers([]);
           }
+          setFirebaseStatus('connected');
+          setLastSyncedAt(new Date());
         },
         (error) => {
           console.warn('Firestore reviewers listener note:', error.message);
@@ -959,30 +912,18 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const authorsColRef = collection(db, 'author_accounts');
       unsubscribeAuthors = onSnapshot(
         authorsColRef,
-        async (snap) => {
+        (snap) => {
           if (!snap.empty) {
             const remoteAuthors: AuthorAccount[] = [];
             snap.forEach((docItem) => {
               remoteAuthors.push(docItem.data() as AuthorAccount);
             });
             setAuthorAccounts(remoteAuthors);
-            setFirebaseStatus('connected');
-            setLastSyncedAt(new Date());
-          } else if (!isAuthorsSeeded.current) {
-            isAuthorsSeeded.current = true;
-            try {
-              const batch = writeBatch(db);
-              initialAuthors.forEach((authItem) => {
-                const aRef = doc(db, 'author_accounts', authItem.id);
-                batch.set(aRef, cleanForFirestore(authItem));
-              });
-              await batch.commit();
-              setFirebaseStatus('connected');
-              setLastSyncedAt(new Date());
-            } catch (err) {
-              console.warn('Seeding initial authors to Firestore:', err);
-            }
+          } else {
+            setAuthorAccounts([]);
           }
+          setFirebaseStatus('connected');
+          setLastSyncedAt(new Date());
         },
         (error) => {
           console.warn('Firestore author_accounts listener note:', error.message);
@@ -1959,19 +1900,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const resetAdvisoryBoardToDefaults = () => {
-    if (!assertAdmin('resetAdvisoryBoardToDefaults')) return;
-    setAdvisoryBoard(initialAdvisoryBoard);
-    safeLocalStorageSet('chssh_advisory_board', JSON.stringify(initialAdvisoryBoard));
-    try {
-      const batch = writeBatch(db);
-      initialAdvisoryBoard.forEach(mem => {
-        const memRef = doc(db, 'advisory_board', mem.id);
-        batch.set(memRef, cleanForFirestore(mem));
-      });
-      batch.commit().catch(e => console.warn(e));
-    } catch (e) {
-      console.warn(e);
-    }
+    // No mock data or automatic reset allowed; records are managed exclusively via admin panel
+    console.info('Advisory board is managed exclusively through the authorized admin panel.');
   };
 
   const applyReviewer = async (data: Omit<Reviewer, 'id' | 'status' | 'appliedDate'>): Promise<boolean> => {
@@ -2145,11 +2075,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
-  const resetAssetToDefault = (assetId: string) => {
-    if (!assertAdmin('resetAssetToDefault')) return;
-    if (initialJournalAssets[assetId]) {
-      uploadJournalAsset(initialJournalAssets[assetId]);
-    }
+  const resetAssetToDefault = (_assetId: string) => {
+    console.info('Assets are managed exclusively through authorized admin upload.');
   };
 
   const uploadPdfAsset = async (

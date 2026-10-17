@@ -116,7 +116,17 @@ export const Archive: React.FC = () => {
           )}
         </div>
 
-        {filteredArticles.length === 0 ? (
+        {publishedArticles.length === 0 ? (
+          <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
+            <BookOpen className="w-10 h-10 mx-auto text-stone-400" />
+            <div className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">
+              No papers have been published yet.
+            </div>
+            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-sm mx-auto">
+              Published peer-reviewed articles will be permanently archived and indexed here.
+            </p>
+          </div>
+        ) : filteredArticles.length === 0 ? (
           <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
             <Search className="w-8 h-8 text-stone-300 dark:text-stone-600 mx-auto" />
             <div className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">No papers match your query</div>

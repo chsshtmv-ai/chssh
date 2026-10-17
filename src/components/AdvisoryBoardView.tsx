@@ -29,7 +29,11 @@ export const AdvisoryBoardView: React.FC = () => {
     { id: 'policy', label: 'Policy & Governance' },
   ];
 
-  const filteredAdvisors = advisoryBoard.filter((member) => {
+  const approvedAdvisors = advisoryBoard.filter(
+    (member) => (member as any).status !== 'draft' && (member as any).status !== 'pending'
+  );
+
+  const filteredAdvisors = approvedAdvisors.filter((member) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
       member.name.toLowerCase().includes(term) ||
@@ -42,8 +46,8 @@ export const AdvisoryBoardView: React.FC = () => {
     return matchesSearch && matchesCategory;
   });
 
-  const countriesCount = new Set(advisoryBoard.map((m) => m.country)).size;
-  const institutionsCount = new Set(advisoryBoard.map((m) => m.affiliation)).size;
+  const countriesCount = new Set(approvedAdvisors.map((m) => m.country)).size;
+  const institutionsCount = new Set(approvedAdvisors.map((m) => m.affiliation)).size;
 
   const getCategoryBadgeClass = (category?: AdvisoryCategory) => {
     switch (category) {
@@ -220,14 +224,24 @@ export const AdvisoryBoardView: React.FC = () => {
         {/* Advisors Grid */}
         <div className="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 pb-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-stone-700 dark:text-stone-300">
-            Advisory Board Members ({filteredAdvisors.length} of {advisoryBoard.length})
+            Advisory Board Members ({filteredAdvisors.length} of {approvedAdvisors.length})
           </h3>
           <span className="text-xs text-stone-500 dark:text-stone-400 font-mono">
             Peer Reviewed &amp; Appointed Council
           </span>
         </div>
 
-        {filteredAdvisors.length === 0 ? (
+        {approvedAdvisors.length === 0 ? (
+          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
+            <GraduationCap className="w-10 h-10 mx-auto text-stone-400" />
+            <h4 className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">
+              Advisory Board information will be updated soon.
+            </h4>
+            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto">
+              Official board members are appointed by the Editorial Council and will appear here once approved.
+            </p>
+          </div>
+        ) : filteredAdvisors.length === 0 ? (
           <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
             <GraduationCap className="w-10 h-10 mx-auto text-stone-400" />
             <h4 className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">
