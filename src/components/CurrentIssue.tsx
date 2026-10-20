@@ -29,7 +29,8 @@ export const CurrentIssue: React.FC = () => {
     requireAuthorAuth,
     downloadPublishedPaper,
     fetchActivePdf,
-    activePdf
+    activePdf,
+    isAdmin
   } = useJournal();
   const [filterQuery, setFilterQuery] = useState('');
 

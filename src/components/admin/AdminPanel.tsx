@@ -42,12 +42,6 @@ import { AdminPublicationSection } from './AdminPublicationSection';
 import { DocumentPreviewModal } from '../DocumentPreviewModal';
 import { triggerFileDownload } from '../../utils/downloadGenerators';
 import { getAssetFile } from '../../utils/fileStorage';
-import {
-  generateCoverPagePdf,
-  generateManuscriptTemplatePdf,
-  generateTableOfContentsPdf,
-  generatePlagiarismDeclarationPdf
-} from '../../utils/pdfGenerators';
 import { validatePdfFile, getFreshPdfUrl } from '../../services/pdfStorageService';
 
 export const AdminPanel: React.FC = () => {
@@ -342,12 +336,9 @@ export const AdminPanel: React.FC = () => {
         finalUrl = (await getAssetFile(assetKey)) || undefined;
       }
 
-      // Only if genuinely no active PDF exists in Firebase or local storage
       if (!finalUrl) {
-        if (assetKey === 'cover_page') finalUrl = generateCoverPagePdf(content);
-        else if (assetKey === 'author_template') finalUrl = generateManuscriptTemplatePdf(content);
-        else if (assetKey === 'content_page') finalUrl = generateTableOfContentsPdf(content, articles);
-        else if (assetKey === 'plagiarism_declaration') finalUrl = generatePlagiarismDeclarationPdf(content);
+        alert('No document file has been uploaded for this slot yet. Please select and upload a file first.');
+        return;
       }
 
       setPreviewAsset({
@@ -367,7 +358,7 @@ export const AdminPanel: React.FC = () => {
       setIsPreviewOpen(true);
     } catch (err) {
       console.error('Error previewing active asset:', err);
-      alert('Unable to load the latest PDF. Please try again.');
+      alert('Unable to load the document. Please try again.');
     } finally {
       setIsLoadingPreview(false);
       setFetchingPdfSlot(null);
@@ -395,20 +386,17 @@ export const AdminPanel: React.FC = () => {
       return;
     }
 
-    let localUrl = (await getAssetFile(assetKey)) || undefined;
-    if (!localUrl) {
-      if (assetKey === 'cover_page') localUrl = generateCoverPagePdf(content);
-      else if (assetKey === 'author_template') localUrl = generateManuscriptTemplatePdf(content);
-      else if (assetKey === 'content_page') localUrl = generateTableOfContentsPdf(content, articles);
-      else if (assetKey === 'plagiarism_declaration') localUrl = generatePlagiarismDeclarationPdf(content);
-    }
+    const localUrl = (await getAssetFile(assetKey)) || undefined;
     if (localUrl) {
       triggerFileDownload(
         localUrl,
         active?.fileName || fallbackFileName,
         active?.fileType || 'application/pdf'
       );
+      return;
     }
+
+    alert('No document file has been uploaded for this slot yet. Please select and upload a file first.');
   };
 
   return (
@@ -854,7 +842,6 @@ export const AdminPanel: React.FC = () => {
           addAdvisoryMember={addAdvisoryMember}
           updateAdvisoryMember={updateAdvisoryMember}
           deleteAdvisoryMember={deleteAdvisoryMember}
-          resetAdvisoryBoardToDefaults={resetAdvisoryBoardToDefaults}
         />
       )}
 
@@ -1200,21 +1187,21 @@ export const AdminPanel: React.FC = () => {
                             />
                           </label>
 
-                          {/* Reset to Default Button */}
+                          {/* Remove Uploaded File Button */}
                           {currentAsset?.isUploaded && (
                             <button
                               type="button"
                               disabled={Boolean(uploadingSlotId)}
                               onClick={() => {
-                                if (window.confirm(`Reset "${item.label}" back to the default journal template?`)) {
-                                  resetAssetToDefault(item.id);
+                                if (window.confirm(`Remove uploaded file for "${item.label}"?`)) {
+                                  deleteJournalAsset(item.id);
                                 }
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-stone-800 text-slate-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-100 dark:hover:bg-stone-800 text-xs cursor-pointer transition disabled:opacity-40"
-                              title="Revert back to default scholarly template"
+                              title="Remove uploaded document file"
                             >
-                              <RotateCcw className="w-3 h-3" />
-                              <span>Reset</span>
+                              <Trash2 className="w-3 h-3 text-red-500" />
+                              <span>Remove</span>
                             </button>
                           )}
                         </div>

@@ -280,7 +280,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const saved = localStorage.getItem('chssh_editorial_board');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed: EditorialMember[] = JSON.parse(saved);
+        return parsed.filter(m => !['ed-1', 'ed-2', 'ed-3', 'ed-4', 'ed-5', 'ed-6'].includes(m.id));
       }
     } catch (e) {
       console.error('Error loading local editorial board', e);
@@ -293,8 +294,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const saved = localStorage.getItem('chssh_advisory_board');
       if (saved) {
         const parsed: AdvisoryBoardMember[] = JSON.parse(saved);
-        // Exclude legacy mock advisory board IDs
-        return parsed.filter(m => !['adv-5', 'adv-6', 'adv-7', 'adv-8'].includes(m.id));
+        // Exclude all legacy mock advisory board IDs
+        return parsed.filter(m => !['adv-1', 'adv-2', 'adv-3', 'adv-4', 'adv-5', 'adv-6', 'adv-7', 'adv-8'].includes(m.id));
       }
     } catch (e) {
       console.error('Error loading local advisory board', e);

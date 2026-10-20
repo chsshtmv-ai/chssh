@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useJournal } from '../context/JournalContext';
-import { initialAuthors, normalizePhoneNumber } from '../data/defaultAuthors';
+import { normalizePhoneNumber } from '../data/defaultAuthors';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   User,
@@ -227,11 +227,6 @@ export const AuthorAuthModal: React.FC<AuthorAuthModalProps> = ({
     }
   };
 
-  const handleDemoFill = (author: typeof initialAuthors[0]) => {
-    setLoginIdentifier(author.userId);
-    setLoginPassword(author.password);
-    setErrorMessage('');
-  };
 
   const handleCopy = (text: string, type: 'user' | 'pass') => {
     navigator.clipboard.writeText(text);
@@ -423,29 +418,6 @@ export const AuthorAuthModal: React.FC<AuthorAuthModalProps> = ({
                 <ArrowRight className="w-4 h-4" />
               </button>
 
-              <div className="pt-3 border-t border-stone-200 dark:border-stone-800 space-y-2">
-                <div className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-sky-500" />
-                  <span>Quick Test Logins (Demo Scholars)</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                  {initialAuthors.map((auth) => (
-                    <button
-                      key={auth.id}
-                      type="button"
-                      onClick={() => handleDemoFill(auth)}
-                      className="p-2 text-left bg-stone-50 dark:bg-stone-800/80 hover:bg-stone-100 dark:hover:bg-stone-750 border border-stone-200/80 dark:border-stone-700 rounded-lg transition cursor-pointer text-xs group"
-                    >
-                      <div className="font-bold text-slate-900 dark:text-slate-100 group-hover:text-[#1c355e] dark:group-hover:text-sky-300 truncate">
-                        {auth.name.replace(/^(Dr\.|Prof\.)\s*/, '')}
-                      </div>
-                      <div className="text-[10px] text-stone-500 dark:text-stone-400 font-mono truncate">
-                        ID: {auth.userId}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </form>
           )}
 
@@ -780,32 +752,6 @@ export const AuthorAuthModal: React.FC<AuthorAuthModalProps> = ({
                 </motion.div>
               )}
 
-              <div className="pt-2 border-t border-stone-200 dark:border-stone-800">
-                <div className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-1.5">
-                  Try demo recovery with pre-registered phone numbers:
-                </div>
-                <div className="space-y-1 text-xs">
-                  {initialAuthors.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => {
-                        setSearchPhone(a.phone);
-                        const res = retrieveCredentialsByPhone(a.phone);
-                        if (res.success && res.account) {
-                          setRetrievedAccount(res.account);
-                          setSuccessMessage(`Account found for ${res.account.name}!`);
-                          setErrorMessage('');
-                        }
-                      }}
-                      className="w-full text-left p-1.5 rounded hover:bg-stone-100 dark:hover:bg-stone-800 flex items-center justify-between text-stone-700 dark:text-stone-300 cursor-pointer transition font-mono text-[11px]"
-                    >
-                      <span className="font-sans font-medium">{a.name}</span>
-                      <span className="text-amber-800 dark:text-amber-400 font-bold">{a.phone}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
         </div>

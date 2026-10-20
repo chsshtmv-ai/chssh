@@ -179,20 +179,6 @@ export const TrackSubmission: React.FC = () => {
           </button>
         </form>
 
-        {/* Quick Demo Links */}
-        <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-500 dark:text-slate-400">
-          <span>Sample Tracking IDs:</span>
-          {articles.slice(0, 3).map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => selectPredefined(a)}
-              className="px-2 py-0.5 rounded bg-slate-100 dark:bg-stone-800 hover:bg-slate-200 text-[#102344] dark:text-sky-300 font-mono text-[11px] cursor-pointer"
-            >
-              {a.trackingId}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Author Account Submissions List (if logged in) */}

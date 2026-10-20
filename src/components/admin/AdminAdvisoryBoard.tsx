@@ -8,7 +8,6 @@ import {
   Search,
   Check,
   X,
-  RotateCcw,
   Building
 } from 'lucide-react';
 import { ImageUploadField } from './ImageUploadField';
@@ -19,15 +18,13 @@ interface AdminAdvisoryBoardProps {
   addAdvisoryMember: (member: Omit<AdvisoryBoardMember, 'id'>) => void;
   updateAdvisoryMember: (id: string, member: Partial<AdvisoryBoardMember>) => void;
   deleteAdvisoryMember: (id: string) => void;
-  resetAdvisoryBoardToDefaults?: () => void;
 }
 
 export const AdminAdvisoryBoard: React.FC<AdminAdvisoryBoardProps> = ({
   advisoryBoard,
   addAdvisoryMember,
   updateAdvisoryMember,
-  deleteAdvisoryMember,
-  resetAdvisoryBoardToDefaults
+  deleteAdvisoryMember
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -149,22 +146,8 @@ export const AdminAdvisoryBoard: React.FC<AdminAdvisoryBoardProps> = ({
             Manage the distinguished international scholars, academic council members, and honorary fellows listed on the public website. Changes sync in real-time across Firestore.
           </p>
         </div>
+
         <div className="flex items-center gap-2 flex-wrap">
-          {resetAdvisoryBoardToDefaults && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('Reset Advisory Board to scholarly initial defaults (8 international scholars)?')) {
-                  resetAdvisoryBoardToDefaults();
-                  showToast('Advisory Board reset to scholarly defaults.');
-                }
-              }}
-              className="px-3 py-2 text-xs font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-200 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 rounded-xl transition cursor-pointer flex items-center gap-1.5"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Defaults</span>
-            </button>
-          )}
           <button
             type="button"
             onClick={() => {
