@@ -16,8 +16,10 @@ import {
   Lock,
   Clock,
   UploadCloud,
-  CheckCircle2
+  CheckCircle2,
+  Eye
 } from 'lucide-react';
+import { DocumentPreviewModal } from './DocumentPreviewModal';
 
 interface ArticleModalProps {
   article: Article | null;
@@ -40,6 +42,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
   const [copied, setCopied] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [certDownloading, setCertDownloading] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (article) {
@@ -57,6 +60,11 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
   const doi = article.doi || `10.5281/chssh.${year}.${volume}${issue}01`;
 
   const hasUploadedPaper = Boolean(
+    article.publishedStoragePath ||
+    article.storagePath ||
+    article.publishedDownloadURL ||
+    article.downloadURL ||
+    article.publishedFileName ||
     article.publishedFileDataUrl ||
     article.publishedFileUrl ||
     (typeof window !== 'undefined' && localStorage.getItem(`chssh_pub_file_${article.id}`))
@@ -76,8 +84,8 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
   };
 
   const handleDownloadPublished = () => {
-    requireAuthorAuth(() => {
-      const success = downloadPublishedPaper(article);
+    requireAuthorAuth(async () => {
+      const success = await downloadPublishedPaper(article);
       if (success) {
         setDownloadSuccess(true);
         setTimeout(() => setDownloadSuccess(false), 3500);
@@ -207,6 +215,16 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     type="button"
+                    onClick={() => setIsPreviewOpen(true)}
+                    className="flex items-center gap-2 px-3.5 py-2 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200 rounded-xl text-xs font-semibold border border-stone-200 dark:border-stone-700 shadow-2xs transition-all cursor-pointer"
+                  >
+                    <Eye className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                    <span>Preview Document</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
                     onClick={handleDownloadPublished}
                     className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
                   >
@@ -254,18 +272,30 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
             <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
               <div className="flex items-center gap-2 flex-wrap">
                 {hasUploadedPaper ? (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    type="button"
-                    onClick={handleDownloadPublished}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-[#1c355e] hover:bg-[#102344] text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all cursor-pointer"
-                  >
-                    <Download className="w-4 h-4 text-sky-300" />
-                    <span>
-                      <EditableText id="modal_download_btn" placeholder="Download Published Article" />
-                    </span>
-                  </motion.button>
+                  <>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="button"
+                      onClick={() => setIsPreviewOpen(true)}
+                      className="flex items-center gap-2 px-3.5 py-2.5 bg-stone-100 hover:bg-stone-200 dark:bg-stone-800 dark:hover:bg-stone-700 text-stone-800 dark:text-stone-200 rounded-xl text-xs font-semibold border border-stone-200 dark:border-stone-700 shadow-2xs transition-all cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                      <span>Preview File</span>
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      type="button"
+                      onClick={handleDownloadPublished}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-[#1c355e] hover:bg-[#102344] text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 text-sky-300" />
+                      <span>
+                        <EditableText id="modal_download_btn" placeholder="Download Published Article" />
+                      </span>
+                    </motion.button>
+                  </>
                 ) : (
                   <button
                     type="button"
@@ -386,6 +416,31 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
           </button>
         </div>
       </motion.div>
+
+      {/* Public Document Preview Modal */}
+      {isPreviewOpen && (
+        <DocumentPreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          asset={{
+            id: article.id,
+            title: article.title,
+            description: `Vol. ${volume}, Issue ${issue} (${year}) • Track: ${article.track}`,
+            category: 'document',
+            fileName: article.publishedFileName || article.fileName || `${article.trackingId}.pdf`,
+            fileSize: article.publishedFileSize || article.fileSize || 'Standard Document',
+            fileType: article.publishedMimeType || article.mimeType || (article.publishedFileName?.toLowerCase().endsWith('.docx') ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf'),
+            storagePath: article.publishedStoragePath || article.storagePath,
+            downloadURL: article.publishedDownloadURL || article.downloadURL || article.publishedFileUrl || article.fileUrl,
+            fileDataUrl: article.publishedFileDataUrl || article.publishedDownloadURL || article.downloadURL || article.publishedFileUrl || article.fileUrl,
+            uploadedAt: article.publishedUploadedAt || article.publishedDate || article.submissionDate,
+            volumeInfo: `Vol. ${volume}, Issue ${issue} (${year})`
+          }}
+          onDownload={() => {
+            downloadPublishedPaper(article);
+          }}
+        />
+      )}
     </div>
   );
 };

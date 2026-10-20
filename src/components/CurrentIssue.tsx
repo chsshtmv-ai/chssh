@@ -421,8 +421,8 @@ export const CurrentIssue: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        requireAuthorAuth(() => {
-                          const success = downloadPublishedPaper(article);
+                        requireAuthorAuth(async () => {
+                          const success = await downloadPublishedPaper(article);
                           if (!success) {
                             setSelectedArticleForView(article);
                           }

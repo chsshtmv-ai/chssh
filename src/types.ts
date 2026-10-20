@@ -67,6 +67,15 @@ export interface Article {
   publishedFileUrl?: string;
   publishedFileType?: string;
   publishedUploadedAt?: string;
+  // Firebase Storage canonical fields
+  storagePath?: string;
+  downloadURL?: string;
+  mimeType?: string;
+  fileSizeBytes?: number;
+  originalFileName?: string;
+  publishedStoragePath?: string;
+  publishedDownloadURL?: string;
+  publishedMimeType?: string;
 }
 
 export interface EditorialMember {

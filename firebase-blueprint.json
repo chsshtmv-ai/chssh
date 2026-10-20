@@ -31,7 +31,19 @@
         "publishedDate": { "type": "string" },
         "volume": { "type": "number" },
         "issue": { "type": "number" },
-        "doi": { "type": "string" }
+        "doi": { "type": "string" },
+        "storagePath": { "type": "string" },
+        "downloadURL": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "publishedFileName": { "type": "string" },
+        "publishedStoragePath": { "type": "string" },
+        "publishedDownloadURL": { "type": "string" },
+        "publishedFileSize": { "type": "string" },
+        "publishedFileType": { "type": "string" },
+        "publishedMimeType": { "type": "string" },
+        "publishedUploadedAt": { "type": "string" }
       },
       "required": ["id", "trackingId", "title", "status"]
     },

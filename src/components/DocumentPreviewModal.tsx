@@ -10,6 +10,7 @@ import {
 import { JournalUploadedAsset } from '../types';
 import { detectDocumentFormat, dataUrlToBlobUrl } from '../utils/documentHelpers';
 import { triggerFileDownload } from '../utils/downloadGenerators';
+import { downloadOriginalFileFromStorage } from '../services/documentStorageService';
 import { useJournal } from '../context/JournalContext';
 import { PdfCanvasViewer } from './PdfCanvasViewer';
 
@@ -63,32 +64,35 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
   if (!isOpen || !asset) return null;
 
-  const handleDownloadOriginal = () => {
+  const handleDownloadOriginal = async () => {
     if (onDownload) {
       onDownload(asset, detectedFormat === 'pdf' ? 'pdf' : detectedFormat === 'docx' ? 'docx' : undefined);
-    } else if (effectiveDataUrl) {
+      return;
+    }
+    
+    // Check if asset has Firebase Storage reference
+    if (asset?.storagePath || asset?.downloadURL) {
+      try {
+        await downloadOriginalFileFromStorage({
+          storagePath: asset.storagePath,
+          downloadURL: asset.downloadURL,
+          fileName: asset.fileName,
+          mimeType: asset.fileType,
+          documentId: asset.id
+        });
+        return;
+      } catch (err) {
+        console.warn('downloadOriginalFileFromStorage in preview modal failed, checking dataUrl:', err);
+      }
+    }
+
+    if (effectiveDataUrl) {
       const ext = detectedFormat === 'docx' ? '.docx' : '.pdf';
       const safeName = asset.fileName ? (asset.fileName.includes('.') ? asset.fileName : `${asset.fileName}${ext}`) : `${asset.id || 'document'}${ext}`;
       triggerFileDownload(
         effectiveDataUrl,
         safeName,
         detectedFormat === 'docx'
-          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-          : 'application/pdf'
-      );
-    }
-  };
-
-  const handleDownloadAlternate = (target: 'docx' | 'pdf') => {
-    if (onDownload) {
-      onDownload(asset, target);
-    } else if (effectiveDataUrl) {
-      const ext = target === 'docx' ? '.docx' : '.pdf';
-      const base = (asset.fileName || asset.id || 'document').replace(/\.(pdf|docx|doc)$/i, '');
-      triggerFileDownload(
-        effectiveDataUrl,
-        `${base}${ext}`,
-        target === 'docx'
           ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
           : 'application/pdf'
       );
@@ -282,28 +286,6 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
               >
                 Close
               </button>
-
-              {detectedFormat === 'pdf' ? (
-                <button
-                  type="button"
-                  onClick={() => handleDownloadAlternate('docx')}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 transition cursor-pointer"
-                  title="Download converted Word document"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Also get as Word (.docx)</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleDownloadAlternate('pdf')}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 hover:bg-red-100 transition cursor-pointer"
-                  title="Download converted PDF document"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Also get as PDF (.pdf)</span>
-                </button>
-              )}
 
               <button
                 type="button"

@@ -31,7 +31,11 @@ import {
   purgeLegacyFilesFromLocalStorage,
   safeLocalStorageSet
 } from '../utils/fileStorage';
-import { generateAuthorOriginalManuscriptWordDoc } from '../utils/downloadGenerators';
+import {
+  uploadOriginalFileToStorage,
+  downloadOriginalFileFromStorage,
+  detectMimeType
+} from '../services/documentStorageService';
 import {
   SmsGatewayConfig,
   DEFAULT_SMS_CONFIG,
@@ -142,15 +146,19 @@ interface JournalContextType {
   uploadPublishedPaper: (
     articleId: string,
     fileData: {
-      publishedFileDataUrl: string;
+      file?: File;
+      publishedFileDataUrl?: string;
       publishedFileName: string;
       publishedFileSize: string;
       publishedFileType?: string;
+      storagePath?: string;
+      downloadURL?: string;
+      mimeType?: string;
     }
-  ) => void;
+  ) => Promise<Article | undefined>;
   removePublishedPaper: (articleId: string) => void;
-  downloadOriginalManuscript: (article: Article) => void;
-  downloadPublishedPaper: (article: Article) => boolean;
+  downloadOriginalManuscript: (article: Article) => Promise<void> | void;
+  downloadPublishedPaper: (article: Article) => Promise<boolean> | boolean;
   updateArticle: (article: Article) => void;
   deleteArticle: (id: string) => void;
   incrementArticleViews: (id: string) => void;
@@ -1574,41 +1582,93 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   };
 
-  const uploadPublishedPaper = (
+  const uploadPublishedPaper = async (
     articleId: string,
     fileData: {
-      publishedFileDataUrl: string;
+      file?: File;
+      publishedFileDataUrl?: string;
       publishedFileName: string;
       publishedFileSize: string;
       publishedFileType?: string;
+      storagePath?: string;
+      downloadURL?: string;
+      mimeType?: string;
     }
-  ) => {
+  ): Promise<Article | undefined> => {
     if (!assertAdmin('uploadPublishedPaper')) return;
     const today = new Date().toISOString().split('T')[0];
     
-    savePublishedPaperFile(articleId, fileData.publishedFileDataUrl).catch(e => console.warn(e));
+    let storagePath = fileData.storagePath;
+    let downloadURL = fileData.downloadURL;
+    let mimeType = fileData.mimeType || detectMimeType(fileData.publishedFileName, fileData.publishedFileType);
+    let fileSize = fileData.publishedFileSize;
+    let fileSizeBytes: number | undefined;
+
+    // 1. Upload genuine original binary file to Firebase Storage if provided
+    if (fileData.file) {
+      try {
+        const uploadResult = await uploadOriginalFileToStorage(fileData.file, articleId, 'published_papers');
+        storagePath = uploadResult.storagePath;
+        downloadURL = uploadResult.downloadURL;
+        mimeType = uploadResult.mimeType;
+        fileSize = uploadResult.fileSize;
+        fileSizeBytes = uploadResult.fileSizeBytes;
+      } catch (uploadErr) {
+        console.error('Firebase Storage upload failed:', uploadErr);
+        throw uploadErr;
+      }
+    }
+
+    if (fileData.publishedFileDataUrl) {
+      savePublishedPaperFile(articleId, fileData.publishedFileDataUrl).catch(e => console.warn(e));
+    }
+
+    let updatedArt: Article | undefined;
     setArticles(prev =>
       prev.map(art => {
         if (art.id !== articleId) return art;
         const updated: Article = {
           ...art,
-          publishedFileDataUrl: fileData.publishedFileDataUrl,
+          status: 'published',
+          publishedDate: art.publishedDate || today,
           publishedFileName: fileData.publishedFileName,
-          publishedFileSize: fileData.publishedFileSize,
-          publishedFileType: fileData.publishedFileType || 'pdf',
+          fileName: fileData.publishedFileName,
+          originalFileName: fileData.publishedFileName,
+          publishedFileSize: fileSize,
+          fileSize: fileSize,
+          publishedFileType: fileData.publishedFileType || (fileData.publishedFileName.toLowerCase().endsWith('.pdf') ? 'pdf' : 'docx'),
           publishedUploadedAt: today,
-          lastUpdatedDate: today
+          lastUpdatedDate: today,
+          storagePath: storagePath || art.storagePath,
+          downloadURL: downloadURL || art.downloadURL,
+          publishedStoragePath: storagePath || art.publishedStoragePath,
+          publishedDownloadURL: downloadURL || art.publishedDownloadURL,
+          mimeType: mimeType || art.mimeType,
+          publishedMimeType: mimeType || art.publishedMimeType,
+          ...(fileSizeBytes ? { fileSizeBytes } : {}),
+          ...(fileData.publishedFileDataUrl ? { publishedFileDataUrl: fileData.publishedFileDataUrl } : {})
         };
+        updatedArt = updated;
+
         try {
           const artDocRef = doc(db, 'articles', articleId);
           const toSave: Record<string, unknown> = {
+            status: 'published',
+            publishedDate: updated.publishedDate,
             publishedFileName: fileData.publishedFileName,
-            publishedFileSize: fileData.publishedFileSize,
-            publishedFileType: fileData.publishedFileType || 'pdf',
+            fileName: fileData.publishedFileName,
+            originalFileName: fileData.publishedFileName,
+            publishedFileSize: fileSize,
+            fileSize: fileSize,
+            publishedFileType: updated.publishedFileType,
             publishedUploadedAt: today,
-            lastUpdatedDate: today
+            lastUpdatedDate: today,
+            ...(storagePath ? { storagePath, publishedStoragePath: storagePath } : {}),
+            ...(downloadURL ? { downloadURL, publishedDownloadURL: downloadURL } : {}),
+            ...(mimeType ? { mimeType, publishedMimeType: mimeType } : {}),
+            ...(fileSizeBytes ? { fileSizeBytes } : {})
           };
-          if (fileData.publishedFileDataUrl.length < 700000) {
+          if (fileData.publishedFileDataUrl && fileData.publishedFileDataUrl.length < 700000) {
             toSave.publishedFileDataUrl = fileData.publishedFileDataUrl;
           }
           updateDoc(artDocRef, cleanForFirestore(toSave)).catch(err => {
@@ -1620,6 +1680,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return updated;
       })
     );
+    return updatedArt;
   };
 
   const removePublishedPaper = (articleId: string) => {
@@ -1639,7 +1700,10 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
           publishedFileName: undefined,
           publishedFileSize: undefined,
           publishedFileType: undefined,
-          publishedUploadedAt: undefined
+          publishedUploadedAt: undefined,
+          publishedStoragePath: undefined,
+          publishedDownloadURL: undefined,
+          publishedMimeType: undefined
         };
         try {
           const artDocRef = doc(db, 'articles', articleId);
@@ -1648,7 +1712,10 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             publishedFileName: deleteField(),
             publishedFileSize: deleteField(),
             publishedFileType: deleteField(),
-            publishedUploadedAt: deleteField()
+            publishedUploadedAt: deleteField(),
+            publishedStoragePath: deleteField(),
+            publishedDownloadURL: deleteField(),
+            publishedMimeType: deleteField()
           }).catch(err => {
             console.warn('Error deleting published paper fields in Firestore:', err);
           });
@@ -1660,13 +1727,31 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     );
   };
 
-  const downloadOriginalManuscript = (article: Article) => {
-    let safeName = article.fileName || `${article.trackingId}_Original_Manuscript.docx`;
+  const downloadOriginalManuscript = async (article: Article): Promise<void> => {
+    let safeName = article.fileName || article.originalFileName || `${article.trackingId}_Original_Manuscript.docx`;
     if (safeName.toLowerCase().endsWith('.txt')) {
       safeName = safeName.replace(/\.txt$/i, '.docx');
-    } else if (!safeName.toLowerCase().endsWith('.docx') && !safeName.toLowerCase().endsWith('.doc')) {
-      safeName = `${safeName}.docx`;
     }
+
+    // 1. Check persistent Firebase Storage reference
+    const storagePath = article.storagePath;
+    const downloadURL = article.downloadURL || article.fileUrl;
+    if (storagePath || downloadURL) {
+      try {
+        await downloadOriginalFileFromStorage({
+          storagePath,
+          downloadURL,
+          fileName: safeName,
+          mimeType: article.mimeType,
+          documentId: article.id
+        });
+        return;
+      } catch (err) {
+        console.warn('Firebase Storage manuscript download failed, checking local cache:', err);
+      }
+    }
+
+    // 2. Check local dataUrl cache
     let dataUrl = article.fileDataUrl;
     if (!dataUrl) {
       try {
@@ -1675,11 +1760,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.warn('LocalStorage error reading original file:', e);
       }
     }
-    if (dataUrl) {
-      if (dataUrl.startsWith('data:text/plain')) {
-        generateAuthorOriginalManuscriptWordDoc(article, content);
-        return;
-      }
+    if (dataUrl && !dataUrl.startsWith('data:text/plain')) {
       const a = document.createElement('a');
       a.href = dataUrl;
       a.download = safeName;
@@ -1688,11 +1769,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       document.body.removeChild(a);
       return;
     }
-    if (article.fileUrl) {
-      window.open(article.fileUrl, '_blank');
-      return;
-    }
-    getOriginalManuscriptFile(article.id).then(storedUrl => {
+
+    try {
+      const storedUrl = await getOriginalManuscriptFile(article.id);
       if (storedUrl && !storedUrl.startsWith('data:text/plain')) {
         const a = document.createElement('a');
         a.href = storedUrl;
@@ -1700,50 +1779,69 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-      } else {
-        generateAuthorOriginalManuscriptWordDoc(article, content);
+        return;
       }
-    }).catch(() => {
-      generateAuthorOriginalManuscriptWordDoc(article, content);
-    });
+    } catch (err) {
+      console.warn('IndexedDB manuscript retrieval failed:', err);
+    }
+
+    // Never generate placeholder document!
+    alert(`The original manuscript file "${safeName}" for tracking ID ${article.trackingId} was not found in storage. Please contact the author or administrator to verify or re-upload the file.`);
   };
 
-  const downloadPublishedPaper = (article: Article): boolean => {
-    let dataUrl = article.publishedFileDataUrl;
-    if (!dataUrl) {
-      try {
-        dataUrl = localStorage.getItem(`chssh_pub_file_${article.id}`) || undefined;
-      } catch (e) {
-        console.warn('LocalStorage error reading published file:', e);
+  const downloadPublishedPaper = async (article: Article): Promise<boolean> => {
+    try {
+      const storagePath = article.publishedStoragePath || article.storagePath;
+      const downloadURL = article.publishedDownloadURL || article.downloadURL || article.publishedFileUrl || article.fileUrl;
+      const fileName = article.publishedFileName || article.fileName || article.originalFileName || `${content.journal_short_name}_Vol${article.volume || 7}_Iss${article.issue || 1}_${article.trackingId}.${article.publishedFileType || 'pdf'}`;
+      const mimeType = article.publishedMimeType || article.mimeType;
+
+      // 1. Download original file directly from Firebase Storage
+      if (storagePath || downloadURL) {
+        await downloadOriginalFileFromStorage({
+          storagePath,
+          downloadURL,
+          fileName,
+          publishedFileName: fileName,
+          mimeType,
+          documentId: article.id
+        });
+        incrementArticleDownloads(article.id);
+        return true;
       }
-    }
-    if (dataUrl) {
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = article.publishedFileName || `${content.journal_short_name}_Vol${article.volume || 7}_Iss${article.issue || 1}_${article.trackingId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      incrementArticleDownloads(article.id);
-      return true;
-    }
-    if (article.publishedFileUrl) {
-      window.open(article.publishedFileUrl, '_blank');
-      incrementArticleDownloads(article.id);
-      return true;
-    }
-    getPublishedPaperFile(article.id).then(storedUrl => {
-      if (storedUrl) {
+
+      // 2. Check cached file in indexedDB / localStorage
+      let dataUrl = article.publishedFileDataUrl;
+      if (!dataUrl) {
+        try {
+          dataUrl = localStorage.getItem(`chssh_pub_file_${article.id}`) || undefined;
+        } catch (e) {
+          console.warn('LocalStorage error reading published file:', e);
+        }
+      }
+      if (!dataUrl) {
+        dataUrl = (await getPublishedPaperFile(article.id)) || undefined;
+      }
+
+      if (dataUrl) {
         const a = document.createElement('a');
-        a.href = storedUrl;
-        a.download = article.publishedFileName || `${content.journal_short_name}_Vol${article.volume || 7}_Iss${article.issue || 1}_${article.trackingId}.pdf`;
+        a.href = dataUrl;
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         incrementArticleDownloads(article.id);
+        return true;
       }
-    });
-    return false;
+
+      // Mandatory Rule 4: Do not silently fall back to a generated document.
+      // If the original file cannot be retrieved, display an error and ask administrator to check or re-upload.
+      alert(`The published document file for "${article.title}" could not be retrieved from Firebase Storage. Please verify the document record or re-upload the file through the Admin Panel.`);
+      return false;
+    } catch (err: any) {
+      console.error('downloadPublishedPaper error:', err);
+      return false;
+    }
   };
 
   const updateArticle = (updatedArticle: Article) => {

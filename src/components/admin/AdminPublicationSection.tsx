@@ -182,28 +182,40 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
     }
   };
 
-  const handleConfirmUpload = () => {
-    if (!targetArticle || !selectedFile || !fileDataUrl) {
+  const handleConfirmUpload = async () => {
+    if (!targetArticle || !selectedFile) {
       setErrorMsg('Please choose an article and select a formatted paper file.');
       return;
     }
-    const fileSizeFormatted = selectedFile.size > 1024 * 1024
-      ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`
-      : `${Math.round(selectedFile.size / 1024)} KB`;
-    const fileType = selectedFile.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'docx';
-    uploadPublishedPaper(targetArticle.id, {
-      publishedFileDataUrl: fileDataUrl,
-      publishedFileName: selectedFile.name,
-      publishedFileSize: fileSizeFormatted,
-      publishedFileType: fileType
-    });
-    setUploadSuccess(`Successfully uploaded journal-templated paper for "${targetArticle.title.slice(0, 45)}..."! Public downloads are now unlocked on the website.`);
-    setSelectedFile(null);
-    setFileDataUrl(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setTimeout(() => {
-      setUploadSuccess(null);
-    }, 5000);
+    setIsProcessing(true);
+    setErrorMsg(null);
+    try {
+      const fileSizeFormatted = selectedFile.size > 1024 * 1024
+        ? `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`
+        : `${Math.round(selectedFile.size / 1024)} KB`;
+      const fileType = selectedFile.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'docx';
+
+      await uploadPublishedPaper(targetArticle.id, {
+        file: selectedFile,
+        publishedFileDataUrl: fileDataUrl || undefined,
+        publishedFileName: selectedFile.name,
+        publishedFileSize: fileSizeFormatted,
+        publishedFileType: fileType
+      });
+
+      setUploadSuccess(`Successfully uploaded and published original file "${selectedFile.name}" to Firebase Storage for "${targetArticle.title.slice(0, 45)}...". Public downloads now serve the exact original file.`);
+      setSelectedFile(null);
+      setFileDataUrl(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setTimeout(() => {
+        setUploadSuccess(null);
+      }, 6000);
+    } catch (err: any) {
+      console.error('Error uploading original paper to Firebase Storage:', err);
+      setErrorMsg(`Upload failed: ${err.message || 'Could not upload to Firebase Storage.'}`);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleRemove = (art: Article) => {

@@ -20,7 +20,7 @@ interface AdminManuscriptDownloadsProps {
 export const AdminManuscriptDownloads: React.FC<AdminManuscriptDownloadsProps> = ({
   onSwitchToPublication
 }) => {
-  const { articles, downloadOriginalManuscript, setSelectedArticleForView } = useJournal();
+  const { articles, downloadOriginalManuscript, downloadPublishedPaper, setSelectedArticleForView } = useJournal();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [downloadSuccessId, setDownloadSuccessId] = useState<string | null>(null);
@@ -217,20 +217,31 @@ export const AdminManuscriptDownloads: React.FC<AdminManuscriptDownloadsProps> =
                           ? 'bg-emerald-700 text-white'
                           : 'bg-[#1c355e] hover:bg-[#102344] text-white'
                       }`}
-                      title="Download author's original manuscript as Microsoft Word (.docx)"
+                      title="Download author's original submitted file"
                     >
                       {isDownloaded ? (
                         <>
                           <CheckCircle2 className="w-4 h-4 text-emerald-200 animate-bounce" />
-                          <span>Downloaded Word Doc!</span>
+                          <span>Downloaded Original File!</span>
                         </>
                       ) : (
                         <>
                           <Download className="w-4 h-4 text-sky-300" />
-                          <span>Download Word Manuscript (.docx)</span>
+                          <span>Download Original ({article.fileName || 'Manuscript'})</span>
                         </>
                       )}
                     </button>
+                    {hasPublishedPaper && (
+                      <button
+                        type="button"
+                        onClick={() => downloadPublishedPaper(article)}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs"
+                        title="Download published paper from Firebase Storage"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download Published Paper</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setSelectedArticleForView(article)}
