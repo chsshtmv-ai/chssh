@@ -20,6 +20,7 @@ import {
   Eye
 } from 'lucide-react';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
+import { GoogleDrivePreviewModal } from './GoogleDrivePreviewModal';
 
 interface ArticleModalProps {
   article: Article | null;
@@ -59,7 +60,10 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
   const pages = article.pages || '1 20';
   const doi = article.doi || `10.5281/chssh.${year}.${volume}${issue}01`;
 
+  const isGoogleDriveArticle = Boolean(article.driveUrl || article.driveFileId);
+
   const hasUploadedPaper = Boolean(
+    isGoogleDriveArticle ||
     article.publishedStoragePath ||
     article.storagePath ||
     article.publishedDownloadURL ||
@@ -203,11 +207,11 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
                 <div className="space-y-0.5">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    <span>Official Journal-Templated Publication Ready</span>
+                    <span>{isGoogleDriveArticle ? 'Google Drive Document Ready' : 'Official Journal-Templated Publication Ready'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-mono text-stone-700 dark:text-stone-300">
-                    <span className="font-bold">{article.publishedFileName || 'Published_Paper.pdf'}</span>
-                    <span className="text-stone-500">({article.publishedFileSize || '1.8 MB'})</span>
+                    <span className="font-bold">{article.publishedFileName || (isGoogleDriveArticle ? 'Google Drive Document' : 'Published_Paper.pdf')}</span>
+                    <span className="text-stone-500">({isGoogleDriveArticle ? 'Google Drive Cloud' : (article.publishedFileSize || '1.8 MB')})</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -418,7 +422,21 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
       </motion.div>
 
       {/* Public Document Preview Modal */}
-      {isPreviewOpen && (
+      {isPreviewOpen && isGoogleDriveArticle ? (
+        <GoogleDrivePreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          title={article.title}
+          authors={authorsString}
+          driveUrl={article.driveUrl}
+          driveFileId={article.driveFileId}
+          resourceType={article.driveResourceType as any}
+          volumeInfo={`Vol. ${volume}, Issue ${issue} (${year})`}
+          doi={doi}
+          fileName={article.publishedFileName || `${article.trackingId}.pdf`}
+          onDownload={handleDownloadPublished}
+        />
+      ) : isPreviewOpen && (
         <DocumentPreviewModal
           isOpen={isPreviewOpen}
           onClose={() => setIsPreviewOpen(false)}

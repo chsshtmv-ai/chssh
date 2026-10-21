@@ -16,8 +16,10 @@ import { motion } from 'motion/react';
 import { triggerFileDownload } from '../utils/downloadGenerators';
 import { getAssetFile } from '../utils/fileStorage';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
+import { GoogleDrivePreviewModal } from './GoogleDrivePreviewModal';
 import { JournalUploadedAsset } from '../types';
 import { getFreshPdfUrl } from '../services/pdfStorageService';
+import { parseGoogleDriveUrl } from '../utils/googleDriveUtils';
 
 export const DownloadsView: React.FC = () => {
   const { content, uploadedAssets, openAdminAssetUploader, isAdmin, fetchActivePdf } = useJournal();
@@ -32,11 +34,11 @@ export const DownloadsView: React.FC = () => {
     fetchActivePdf('cover_page').catch(() => {});
   }, []);
 
-  // Filter only genuine downloadable files uploaded and approved by the admin
+  // Filter only genuine downloadable files uploaded and approved by the admin or linked to Google Drive
   const genuineDownloads = Object.values(uploadedAssets || {}).filter((asset) => {
     if (!asset || asset.id === 'journal_logo' || asset.category === 'logo') return false;
-    const hasValidFile = Boolean(asset.downloadURL || asset.fileUrl || asset.fileDataUrl);
-    const isApprovedAndUploaded = Boolean(asset.isUploaded || asset.downloadURL || asset.status === 'active');
+    const hasValidFile = Boolean(asset.downloadURL || asset.fileUrl || asset.fileDataUrl || asset.driveUrl || asset.driveFileId);
+    const isApprovedAndUploaded = Boolean(asset.isUploaded || asset.downloadURL || asset.status === 'active' || asset.driveUrl || asset.driveFileId);
     return isApprovedAndUploaded && hasValidFile;
   });
 
@@ -52,6 +54,24 @@ export const DownloadsView: React.FC = () => {
   const handleDownloadAsset = async (asset: JournalUploadedAsset) => {
     setDownloadingId(asset.id);
     try {
+      if (asset.driveUrl || asset.driveFileId) {
+        const parsed = parseGoogleDriveUrl(asset.driveUrl || asset.driveFileId || '');
+        if (parsed.isValid && parsed.downloadUrl) {
+          const a = document.createElement('a');
+          a.href = parsed.downloadUrl;
+          a.download = asset.fileName || `${asset.title.slice(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          return;
+        } else if (!parsed.isValid) {
+          alert(`The Google Drive link for "${asset.title}" is invalid. Please verify in CMS.`);
+          return;
+        }
+      }
+
       const targetUrl = asset.downloadURL || asset.fileUrl || asset.fileDataUrl;
       if (targetUrl) {
         triggerFileDownload(
@@ -164,10 +184,17 @@ export const DownloadsView: React.FC = () => {
                     <div className="w-10 h-10 rounded-lg bg-[#102344]/10 dark:bg-sky-500/10 flex items-center justify-center text-[#102344] dark:text-sky-400 shrink-0">
                       <Icon className="w-5 h-5" />
                     </div>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                      Editorial Approved
-                    </span>
+                    {item.driveUrl || item.driveFileId ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 dark:bg-sky-950/80 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                        <CheckCircle2 className="w-3 h-3 text-sky-600 dark:text-sky-400" />
+                        Google Drive Verified
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                        Editorial Approved
+                      </span>
+                    )}
                   </div>
 
                   <div>
@@ -233,17 +260,30 @@ export const DownloadsView: React.FC = () => {
       </div>
 
       {/* Interactive Document Preview Modal */}
-      <DocumentPreviewModal
-        isOpen={isPreviewOpen}
-        onClose={() => setIsPreviewOpen(false)}
-        asset={previewAsset}
-        dataUrl={previewAsset?.fileDataUrl}
-        onDownload={(asset) => {
-          if (asset) {
-            handleDownloadAsset(asset);
-          }
-        }}
-      />
+      {isPreviewOpen && previewAsset && (previewAsset.driveUrl || previewAsset.driveFileId) ? (
+        <GoogleDrivePreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          title={previewAsset.title}
+          driveUrl={previewAsset.driveUrl}
+          driveFileId={previewAsset.driveFileId}
+          resourceType={previewAsset.driveResourceType as any}
+          fileName={previewAsset.fileName}
+          onDownload={() => handleDownloadAsset(previewAsset)}
+        />
+      ) : isPreviewOpen && (
+        <DocumentPreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          asset={previewAsset}
+          dataUrl={previewAsset?.fileDataUrl}
+          onDownload={(asset) => {
+            if (asset) {
+              handleDownloadAsset(asset);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

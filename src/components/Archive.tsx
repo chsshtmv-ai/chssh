@@ -7,13 +7,19 @@ import {
   Search,
   BookOpen,
   Download,
-  X
+  X,
+  Eye
 } from 'lucide-react';
+import { GoogleDrivePreviewModal } from './GoogleDrivePreviewModal';
+import { DocumentPreviewModal } from './DocumentPreviewModal';
+import { Article } from '../types';
 
 export const Archive: React.FC = () => {
   const { articles, setSelectedArticleForView, requireAuthorAuth, downloadPublishedPaper } = useJournal();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrack, setSelectedTrack] = useState('all');
+  const [previewArticle, setPreviewArticle] = useState<Article | null>(null);
+  const [isArticlePreviewOpen, setIsArticlePreviewOpen] = useState(false);
 
   const publishedArticles = articles.filter((a) => a.status === 'published');
   const tracks = [
@@ -201,6 +207,18 @@ export const Archive: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => {
+                      setPreviewArticle(article);
+                      setIsArticlePreviewOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-750 text-slate-800 dark:text-stone-200 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-200/60 dark:border-stone-700"
+                    title="Preview published research document"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                    <span>Preview</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setSelectedArticleForView(article)}
                     className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-200/60 dark:border-slate-700"
                   >
@@ -229,6 +247,52 @@ export const Archive: React.FC = () => {
           ))
         )}
       </div>
+
+      {/* Published Paper Preview Modal */}
+      {isArticlePreviewOpen && previewArticle && (previewArticle.driveUrl || previewArticle.driveFileId) ? (
+        <GoogleDrivePreviewModal
+          isOpen={isArticlePreviewOpen}
+          onClose={() => {
+            setIsArticlePreviewOpen(false);
+            setPreviewArticle(null);
+          }}
+          title={previewArticle.title}
+          authors={previewArticle.authors.map(a => a.name).join(', ')}
+          driveUrl={previewArticle.driveUrl}
+          driveFileId={previewArticle.driveFileId}
+          resourceType={previewArticle.driveResourceType as any}
+          volumeInfo={`Vol. ${previewArticle.volume || 7}, Issue ${previewArticle.issue || 1} (${previewArticle.year || 2026})`}
+          doi={previewArticle.doi}
+          fileName={previewArticle.publishedFileName || `${previewArticle.trackingId}.pdf`}
+          onDownload={() => {
+            downloadPublishedPaper(previewArticle);
+          }}
+        />
+      ) : isArticlePreviewOpen && previewArticle && (
+        <DocumentPreviewModal
+          isOpen={isArticlePreviewOpen}
+          onClose={() => {
+            setIsArticlePreviewOpen(false);
+            setPreviewArticle(null);
+          }}
+          asset={{
+            id: previewArticle.id,
+            title: previewArticle.title,
+            description: `Vol. ${previewArticle.volume || 7}, Issue ${previewArticle.issue || 1} (${previewArticle.year || 2026}) • Track: ${previewArticle.track}`,
+            category: 'document',
+            fileName: previewArticle.publishedFileName || previewArticle.fileName || `${previewArticle.trackingId}.pdf`,
+            fileSize: previewArticle.publishedFileSize || previewArticle.fileSize || 'Standard Document',
+            fileType: previewArticle.publishedMimeType || previewArticle.mimeType || 'application/pdf',
+            storagePath: previewArticle.publishedStoragePath || previewArticle.storagePath,
+            downloadURL: previewArticle.publishedDownloadURL || previewArticle.downloadURL || previewArticle.publishedFileUrl || previewArticle.fileUrl,
+            fileDataUrl: previewArticle.publishedFileDataUrl || previewArticle.publishedDownloadURL || previewArticle.downloadURL || previewArticle.publishedFileUrl || previewArticle.fileUrl,
+            uploadedAt: previewArticle.publishedUploadedAt || previewArticle.publishedDate || previewArticle.submissionDate
+          }}
+          onDownload={() => {
+            downloadPublishedPaper(previewArticle);
+          }}
+        />
+      )}
     </div>
   );
 };

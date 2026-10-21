@@ -6,7 +6,7 @@ import { initialAdvisoryBoard } from '../data/defaultAdvisoryBoard';
 import { initialJournalAssets } from '../data/defaultAssets';
 import { initialReviewers } from '../data/defaultReviewers';
 import { initialAuthors, normalizePhoneNumber } from '../data/defaultAuthors';
-import { db } from '../lib/firebase';
+import { db, firebaseConfig } from '../lib/firebase';
 import {
   collection,
   doc,
@@ -36,6 +36,7 @@ import {
   downloadOriginalFileFromStorage,
   detectMimeType
 } from '../services/documentStorageService';
+import { parseGoogleDriveUrl } from '../utils/googleDriveUtils';
 import {
   SmsGatewayConfig,
   DEFAULT_SMS_CONFIG,
@@ -68,8 +69,8 @@ interface JournalContextType {
   adminPassword: string;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication';
-  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication') => void;
+  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive';
+  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive') => void;
   openAdminAssetUploader: () => void;
   selectedArticleForView: Article | null;
   setSelectedArticleForView: (article: Article | null) => void;
@@ -159,6 +160,29 @@ interface JournalContextType {
   removePublishedPaper: (articleId: string) => void;
   downloadOriginalManuscript: (article: Article) => Promise<void> | void;
   downloadPublishedPaper: (article: Article) => Promise<boolean> | boolean;
+  registerGoogleDrivePaper: (data: {
+    title: string;
+    authors: Article['authors'];
+    abstract: string;
+    keywords: string[];
+    track: string;
+    volume: number;
+    issue: number;
+    year: number;
+    pages: string;
+    doi?: string;
+    driveUrl: string;
+    coverImage?: string;
+    status: 'published' | 'draft';
+  }) => Promise<Article>;
+  registerGoogleDriveAsset: (data: {
+    id: string;
+    title: string;
+    description: string;
+    category: JournalUploadedAsset['category'];
+    driveUrl: string;
+    status?: 'active' | 'archived' | 'inactive';
+  }) => Promise<JournalUploadedAsset>;
   updateArticle: (article: Article) => void;
   deleteArticle: (id: string) => void;
   incrementArticleViews: (id: string) => void;
@@ -368,7 +392,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [isLiveEditMode, setIsLiveEditMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('home');
-  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication'>('submissions');
+  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive'>('submissions');
   const [selectedArticleForView, setSelectedArticleForView] = useState<Article | null>(null);
 
   const openAdminAssetUploader = () => {
@@ -1791,10 +1815,31 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const downloadPublishedPaper = async (article: Article): Promise<boolean> => {
     try {
-      const storagePath = article.publishedStoragePath || article.storagePath;
-      const downloadURL = article.publishedDownloadURL || article.downloadURL || article.publishedFileUrl || article.fileUrl;
       const fileName = article.publishedFileName || article.fileName || article.originalFileName || `${content.journal_short_name}_Vol${article.volume || 7}_Iss${article.issue || 1}_${article.trackingId}.${article.publishedFileType || 'pdf'}`;
       const mimeType = article.publishedMimeType || article.mimeType;
+
+      // 0. Download original file directly from Google Drive if registered with a Google Drive reference
+      if (article.driveUrl || article.driveFileId) {
+        const parsed = parseGoogleDriveUrl(article.driveUrl || article.driveFileId || '');
+        if (parsed.isValid && parsed.downloadUrl) {
+          const a = document.createElement('a');
+          a.href = parsed.downloadUrl;
+          a.download = fileName;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          incrementArticleDownloads(article.id);
+          return true;
+        } else if (!parsed.isValid) {
+          alert(`Invalid Google Drive link for "${article.title}". Please verify the document URL in the Admin Google Drive Manager.`);
+          return false;
+        }
+      }
+
+      const storagePath = article.publishedStoragePath || article.storagePath;
+      const downloadURL = article.publishedDownloadURL || article.downloadURL || article.publishedFileUrl || article.fileUrl;
 
       // 1. Download original file directly from Firebase Storage
       if (storagePath || downloadURL) {
@@ -1836,12 +1881,122 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       // Mandatory Rule 4: Do not silently fall back to a generated document.
       // If the original file cannot be retrieved, display an error and ask administrator to check or re-upload.
-      alert(`The published document file for "${article.title}" could not be retrieved from Firebase Storage. Please verify the document record or re-upload the file through the Admin Panel.`);
+      alert(`The published document file for "${article.title}" could not be retrieved from Firebase Storage or Google Drive. Please verify the document record or re-upload/re-link the file through the Admin Panel.`);
       return false;
     } catch (err: any) {
       console.error('downloadPublishedPaper error:', err);
       return false;
     }
+  };
+
+  const registerGoogleDrivePaper = async (data: {
+    title: string;
+    authors: Article['authors'];
+    abstract: string;
+    keywords: string[];
+    track: string;
+    volume: number;
+    issue: number;
+    year: number;
+    pages: string;
+    doi?: string;
+    driveUrl: string;
+    coverImage?: string;
+    status: 'published' | 'draft';
+  }): Promise<Article> => {
+    if (!assertAdmin('registerGoogleDrivePaper')) {
+      throw new Error('Admin authorization required to register Google Drive document.');
+    }
+    const today = new Date().toISOString().split('T')[0];
+    const parsed = parseGoogleDriveUrl(data.driveUrl);
+    const fileId = parsed.fileId || '';
+    const trackingId = `CHSSH-${data.year}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const id = `art_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    const newArticle: Article = {
+      id,
+      trackingId,
+      title: data.title.trim(),
+      authors: data.authors,
+      abstract: data.abstract.trim(),
+      keywords: data.keywords,
+      track: data.track,
+      submissionDate: today,
+      status: data.status === 'published' ? 'published' : 'submitted',
+      volume: data.volume,
+      issue: data.issue,
+      year: data.year,
+      pages: data.pages || '1–24',
+      doi: data.doi || undefined,
+      publishedDate: data.status === 'published' ? today : undefined,
+      lastUpdatedDate: today,
+      driveUrl: data.driveUrl.trim(),
+      driveFileId: fileId,
+      driveResourceType: parsed.resourceType,
+      coverImage: data.coverImage || undefined,
+      publishedFileName: `${trackingId}.pdf`,
+      publishedFileType: 'pdf',
+      viewsCount: 1,
+      downloadsCount: 0
+    };
+
+    setArticles(prev => [newArticle, ...prev]);
+
+    try {
+      const artDocRef = doc(db, 'articles', id);
+      await setDoc(artDocRef, cleanForFirestore(newArticle), { merge: true });
+    } catch (err) {
+      console.warn('Error saving registered Google Drive paper to Firestore:', err);
+    }
+
+    return newArticle;
+  };
+
+  const registerGoogleDriveAsset = async (data: {
+    id: string;
+    title: string;
+    description: string;
+    category: JournalUploadedAsset['category'];
+    driveUrl: string;
+    status?: 'active' | 'archived' | 'inactive';
+  }): Promise<JournalUploadedAsset> => {
+    if (!assertAdmin('registerGoogleDriveAsset')) {
+      throw new Error('Admin authorization required to register Google Drive downloadable document.');
+    }
+    const parsed = parseGoogleDriveUrl(data.driveUrl);
+    const fileId = parsed.fileId || '';
+    const today = new Date().toISOString();
+
+    const assetToSave: JournalUploadedAsset = {
+      id: data.id,
+      title: data.title,
+      description: data.description,
+      category: data.category,
+      fileName: `${data.id}_drive_doc.pdf`,
+      fileSize: 'Google Drive Document',
+      fileType: 'application/pdf',
+      driveUrl: data.driveUrl,
+      driveFileId: fileId,
+      driveResourceType: parsed.resourceType,
+      status: data.status || 'active',
+      isUploaded: true,
+      uploadedAt: today,
+      uploadedBy: 'Administrator'
+    };
+
+    setUploadedAssets(prev => ({
+      ...prev,
+      [assetToSave.id]: assetToSave
+    }));
+
+    try {
+      const assetDocRef = doc(db, 'journal_assets', assetToSave.id);
+      await setDoc(assetDocRef, cleanForFirestore(assetToSave), { merge: true });
+    } catch (err) {
+      console.warn('Error saving Google Drive asset to Firestore:', err);
+    }
+
+    return assetToSave;
   };
 
   const updateArticle = (updatedArticle: Article) => {
@@ -2303,7 +2458,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         palette,
         exportDate: new Date().toISOString(),
         journal: "Contemporary Horizons in Social Sciences and Humanities",
-        firebaseDatabaseId: "ai-studio-contemporaryhori-20cba91b-a145-4179-8184-b0997b10bb67"
+        firebaseDatabaseId: firebaseConfig.firestoreDatabaseId
       },
       null,
       2
@@ -2416,6 +2571,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         removePublishedPaper,
         downloadOriginalManuscript,
         downloadPublishedPaper,
+        registerGoogleDrivePaper,
+        registerGoogleDriveAsset,
         updateArticle,
         deleteArticle,
         incrementArticleViews,

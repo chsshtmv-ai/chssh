@@ -5,7 +5,8 @@ import { ArticleDoiBadge } from './ArticleDoiBadge';
 import { printPublicationCertificate, triggerFileDownload } from '../utils/downloadGenerators';
 import { getAssetFile } from '../utils/fileStorage';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
-import { JournalUploadedAsset } from '../types';
+import { GoogleDrivePreviewModal } from './GoogleDrivePreviewModal';
+import { JournalUploadedAsset, Article } from '../types';
 import { getFreshPdfUrl } from '../services/pdfStorageService';
 import { motion } from 'motion/react';
 import {
@@ -38,6 +39,10 @@ export const CurrentIssue: React.FC = () => {
   const [previewCoverAsset, setPreviewCoverAsset] = useState<JournalUploadedAsset | null>(null);
   const [isCoverPreviewOpen, setIsCoverPreviewOpen] = useState(false);
   const [isDownloadingCover, setIsDownloadingCover] = useState(false);
+
+  // Article preview modal state
+  const [previewArticle, setPreviewArticle] = useState<Article | null>(null);
+  const [isArticlePreviewOpen, setIsArticlePreviewOpen] = useState(false);
   const [isLoadingCover, setIsLoadingCover] = useState(false);
 
   const coverAsset = uploadedAssets?.['cover_page'] || uploadedAssets?.['active_pdf'] || activePdf;
@@ -395,6 +400,18 @@ export const CurrentIssue: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        setPreviewArticle(article);
+                        setIsArticlePreviewOpen(true);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-750 text-slate-800 dark:text-stone-200 border border-slate-200/80 dark:border-stone-700 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                      title="Preview published research document"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                      <span>Preview</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         requireAuthorAuth(() => {
                           printPublicationCertificate(
                             {
@@ -459,6 +476,52 @@ export const CurrentIssue: React.FC = () => {
           }
         }}
       />
+
+      {/* Published Paper Preview Modal */}
+      {isArticlePreviewOpen && previewArticle && (previewArticle.driveUrl || previewArticle.driveFileId) ? (
+        <GoogleDrivePreviewModal
+          isOpen={isArticlePreviewOpen}
+          onClose={() => {
+            setIsArticlePreviewOpen(false);
+            setPreviewArticle(null);
+          }}
+          title={previewArticle.title}
+          authors={previewArticle.authors.map(a => a.name).join(', ')}
+          driveUrl={previewArticle.driveUrl}
+          driveFileId={previewArticle.driveFileId}
+          resourceType={previewArticle.driveResourceType as any}
+          volumeInfo={`Vol. ${previewArticle.volume || 7}, Issue ${previewArticle.issue || 1} (${previewArticle.year || 2026})`}
+          doi={previewArticle.doi}
+          fileName={previewArticle.publishedFileName || `${previewArticle.trackingId}.pdf`}
+          onDownload={() => {
+            downloadPublishedPaper(previewArticle);
+          }}
+        />
+      ) : isArticlePreviewOpen && previewArticle && (
+        <DocumentPreviewModal
+          isOpen={isArticlePreviewOpen}
+          onClose={() => {
+            setIsArticlePreviewOpen(false);
+            setPreviewArticle(null);
+          }}
+          asset={{
+            id: previewArticle.id,
+            title: previewArticle.title,
+            description: `Vol. ${previewArticle.volume || 7}, Issue ${previewArticle.issue || 1} (${previewArticle.year || 2026}) • Track: ${previewArticle.track}`,
+            category: 'document',
+            fileName: previewArticle.publishedFileName || previewArticle.fileName || `${previewArticle.trackingId}.pdf`,
+            fileSize: previewArticle.publishedFileSize || previewArticle.fileSize || 'Standard Document',
+            fileType: previewArticle.publishedMimeType || previewArticle.mimeType || 'application/pdf',
+            storagePath: previewArticle.publishedStoragePath || previewArticle.storagePath,
+            downloadURL: previewArticle.publishedDownloadURL || previewArticle.downloadURL || previewArticle.publishedFileUrl || previewArticle.fileUrl,
+            fileDataUrl: previewArticle.publishedFileDataUrl || previewArticle.publishedDownloadURL || previewArticle.downloadURL || previewArticle.publishedFileUrl || previewArticle.fileUrl,
+            uploadedAt: previewArticle.publishedUploadedAt || previewArticle.publishedDate || previewArticle.submissionDate
+          }}
+          onDownload={() => {
+            downloadPublishedPaper(previewArticle);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -76,6 +76,11 @@ export interface Article {
   publishedStoragePath?: string;
   publishedDownloadURL?: string;
   publishedMimeType?: string;
+  // Google Drive integration fields
+  driveUrl?: string;
+  driveFileId?: string;
+  driveResourceType?: 'pdf' | 'document' | 'spreadsheet' | 'presentation' | 'drive_file' | string;
+  coverImage?: string;
 }
 
 export interface EditorialMember {
@@ -163,6 +168,9 @@ export interface JournalUploadedAsset {
   version?: string;
   volumeInfo?: string;
   isUploaded?: boolean;
+  driveUrl?: string;
+  driveFileId?: string;
+  driveResourceType?: string;
 }
 
 export interface JournalContent {

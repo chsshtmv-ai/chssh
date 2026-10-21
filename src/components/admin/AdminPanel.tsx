@@ -32,13 +32,15 @@ import {
   Loader2,
   X,
   Globe,
-  Send
+  Send,
+  FolderOpen
 } from 'lucide-react';
 import { AdminEditorialBoard } from './AdminEditorialBoard';
 import { AdminAdvisoryBoard } from './AdminAdvisoryBoard';
 import { AdminReviewersPanel } from './AdminReviewersPanel';
 import { AdminManuscriptDownloads } from './AdminManuscriptDownloads';
 import { AdminPublicationSection } from './AdminPublicationSection';
+import { AdminGoogleDriveRegistrar } from './AdminGoogleDriveRegistrar';
 import { DocumentPreviewModal } from '../DocumentPreviewModal';
 import { triggerFileDownload } from '../../utils/downloadGenerators';
 import { getAssetFile } from '../../utils/fileStorage';
@@ -506,6 +508,19 @@ export const AdminPanel: React.FC = () => {
           >
             <Download className="w-3.5 h-3.5" />
             <span>Author Files</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAdminActiveSubTab('drive')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer ${
+              adminActiveSubTab === 'drive'
+                ? 'bg-[#102344] text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-stone-800'
+            }`}
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
+            <span>Google Drive Manager</span>
           </button>
 
           <button
@@ -1329,6 +1344,9 @@ export const AdminPanel: React.FC = () => {
           }}
         />
       )}
+
+      {/* SUBTAB: Google Drive Manager */}
+      {adminActiveSubTab === 'drive' && <AdminGoogleDriveRegistrar />}
 
       {/* SUBTAB: Security & SMS */}
       {adminActiveSubTab === 'security' && (
