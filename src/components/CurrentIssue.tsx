@@ -17,7 +17,9 @@ import {
   Eye,
   FileCheck,
   BookOpen,
-  Loader2
+  Loader2,
+  ExternalLink,
+  Clock
 } from 'lucide-react';
 
 export const CurrentIssue: React.FC = () => {
@@ -442,49 +444,60 @@ export const CurrentIssue: React.FC = () => {
                       <Eye className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                       <span>Preview</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        requireAuthorAuth(() => {
-                          printPublicationCertificate(
-                            {
-                              authorName: article.authors.map((a) => a.name).join(', '),
-                              paperTitle: article.title,
-                              trackingId: article.trackingId,
-                              volume: article.volume ? String(article.volume) : undefined,
-                              issue: article.issue ? String(article.issue) : undefined,
-                              pages: article.pages,
-                              doi: article.doi,
-                              date: article.publishedDate || article.submissionDate
-                            },
-                            content,
-                            uploadedAssets?.['certificate_template']
-                          );
-                        }, 'Author Login Required: Please sign in with your User ID and Password to download this Certificate of Publication.');
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-800 hover:bg-sky-900 text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                      title="Download author publication certificate with ISSN and Editor-in-Chief signature"
-                    >
-                      <Award className="w-3.5 h-3.5 text-sky-200" />
-                      <span>Certificate</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        requireAuthorAuth(async () => {
-                          const success = await downloadPublishedPaper(article);
-                          if (!success) {
-                            setSelectedArticleForView(article);
-                          }
-                        }, 'Author Login Required: Please sign in with your User ID and Password to download published research papers.');
-                      }}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#1c355e] hover:bg-[#102344] text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5 text-sky-300" />
-                      <span>
-                        <EditableText id="article_btn_download_pdf" placeholder="Download PDF" />
-                      </span>
-                    </button>
+                    {/* Certificate Button (Active when admin has added certificate link) */}
+                    {article.certificateUrl ? (
+                      <a
+                        href={article.certificateUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                        title="Download / Open Official Publication Certificate (Google Drive)"
+                      >
+                        <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Certificate</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-80" />
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedArticleForView(article)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100/80 dark:bg-stone-800/80 text-stone-400 dark:text-stone-500 rounded-lg text-xs font-medium border border-stone-200/50 dark:border-stone-750 cursor-pointer"
+                        title="Your publication certificate will be available after it is uploaded by the admin."
+                      >
+                        <Award className="w-3.5 h-3.5 opacity-60" />
+                        <span>Certificate Pending</span>
+                      </button>
+                    )}
+
+                    {/* Download Published Paper Button */}
+                    {(article.publishedDownloadURL ||
+                      article.publishedFileDataUrl ||
+                      article.publishedFileName ||
+                      article.publishedFileUrl ||
+                      article.driveUrl ||
+                      article.driveFileId ||
+                      article.publishedStoragePath ||
+                      (typeof window !== 'undefined' && localStorage.getItem(`chssh_pub_file_${article.id}`))) ? (
+                      <button
+                        type="button"
+                        onClick={() => downloadPublishedPaper(article)}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-2xs transition cursor-pointer"
+                        title="Download official finalized published paper (PDF)"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>Download Paper</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedArticleForView(article)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 dark:bg-stone-800 text-slate-500 dark:text-slate-400 rounded-lg text-xs font-medium border border-stone-200 dark:border-stone-700 cursor-pointer"
+                        title="Your published paper will be available here after official publication by the editorial team."
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>PDF Pending</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.article>

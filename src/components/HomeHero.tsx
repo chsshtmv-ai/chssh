@@ -11,12 +11,30 @@ import {
   Award,
   Download,
   ArrowRight,
-  Globe
+  Globe,
+  ExternalLink,
+  Clock
 } from 'lucide-react';
 
 export const HomeHero: React.FC = () => {
-  const { articles, setActiveTab, setSelectedArticleForView } = useJournal();
+  const {
+    articles,
+    setActiveTab,
+    setSelectedArticleForView,
+    downloadPublishedPaper
+  } = useJournal();
   const [selectedTrack, setSelectedTrack] = useState<string>('all');
+
+  const hasUploadedPublishedPaper = (art: any) => Boolean(
+    art.publishedDownloadURL ||
+    art.publishedFileDataUrl ||
+    art.publishedFileName ||
+    art.publishedFileUrl ||
+    art.driveUrl ||
+    art.driveFileId ||
+    art.publishedStoragePath ||
+    (typeof window !== 'undefined' && localStorage.getItem(`chssh_pub_file_${art.id}`))
+  );
 
   const publishedArticles = articles.filter((a) => a.status === 'published');
   const tracks = [
@@ -376,24 +394,62 @@ export const HomeHero: React.FC = () => {
                       </span>
                     ))}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setSelectedArticleForView(article)}
-                      className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-200/60 dark:border-slate-700"
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-lg text-xs font-semibold transition cursor-pointer border border-slate-200/60 dark:border-slate-700"
                     >
                       <EditableText id="article_btn_read_cite" placeholder="Read Abstract & Cite" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedArticleForView(article)}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#1c355e] hover:bg-[#102344] dark:bg-[#23467d] dark:hover:bg-[#1c355e] text-white rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5 text-sky-200" />
-                      <span>
-                        <EditableText id="article_btn_download_pdf" placeholder="Download PDF" />
-                      </span>
-                    </button>
+
+                    {/* Publication Certificate Button (Active when admin has added certificate link) */}
+                    {article.certificateUrl ? (
+                      <a
+                        href={article.certificateUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
+                        title="Download / Open Publication Certificate (Google Drive)"
+                      >
+                        <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Certificate</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-80" />
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedArticleForView(article)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100/80 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 rounded-lg text-xs font-medium border border-slate-200/50 dark:border-slate-750 cursor-pointer"
+                        title="Your publication certificate will be available after it is uploaded by the admin."
+                      >
+                        <Award className="w-3.5 h-3.5 opacity-60" />
+                        <span>Certificate Pending</span>
+                      </button>
+                    )}
+
+                    {/* Download Published Paper PDF (Active when admin has uploaded published paper) */}
+                    {hasUploadedPublishedPaper(article) ? (
+                      <button
+                        type="button"
+                        onClick={() => downloadPublishedPaper(article)}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-2xs transition cursor-pointer"
+                        title="Download official finalized published paper (PDF)"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>Download Paper</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedArticleForView(article)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 dark:bg-stone-800 text-slate-500 dark:text-slate-400 rounded-lg text-xs font-medium border border-stone-200 dark:border-stone-700 cursor-pointer"
+                        title="Your published paper will be available here after official publication by the editorial team."
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>PDF Pending</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.article>

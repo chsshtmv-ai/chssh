@@ -17,7 +17,8 @@ import {
   Clock,
   UploadCloud,
   CheckCircle2,
-  Eye
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { GoogleDrivePreviewModal } from './GoogleDrivePreviewModal';
@@ -313,35 +314,29 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
                 )}
 
                 {article.status === 'published' && (
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    type="button"
-                    onClick={() => {
-                      requireAuthorAuth(() => {
-                        setCertDownloading(true);
-                        printPublicationCertificate(
-                          {
-                            authorName: authorsString,
-                            paperTitle: article.title,
-                            trackingId: article.trackingId || article.id,
-                            volume: `Volume ${volume}`,
-                            issue: `Issue ${issue}`,
-                            pages: typeof pages === 'string' ? pages : 'pp. 1-20',
-                            doi: doi
-                          },
-                          content,
-                          uploadedAssets?.['certificate_template']
-                        );
-                        setTimeout(() => setCertDownloading(false), 2000);
-                      }, 'Author Login Required: Please sign in with your User ID and Password to download the official Certificate of Publication.');
-                    }}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-purple-700 hover:bg-purple-800 dark:bg-purple-800 dark:hover:bg-purple-700 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all cursor-pointer"
-                    title="Generate accredited certificate of publication"
-                  >
-                    <Award className="w-4 h-4 text-purple-200" />
-                    <span>{certDownloading ? 'Opening Certificate...' : 'Download Certificate'}</span>
-                  </motion.button>
+                  article.certificateUrl ? (
+                    <motion.a
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      href={article.certificateUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-4 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-xs font-semibold shadow-xs hover:shadow transition-all cursor-pointer"
+                      title="Download / Open Official Publication Certificate (Google Drive)"
+                    >
+                      <Award className="w-4 h-4 text-amber-200" />
+                      <span>Download Certificate (Google Drive)</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                    </motion.a>
+                  ) : (
+                    <div
+                      className="flex items-center gap-1.5 px-3.5 py-2.5 bg-stone-100 dark:bg-stone-800 text-slate-500 dark:text-slate-400 rounded-xl text-xs border border-stone-200 dark:border-stone-700"
+                      title="Your publication certificate will be available after it is uploaded by the admin."
+                    >
+                      <Award className="w-4 h-4 text-slate-400" />
+                      <span>Certificate Pending Admin Upload</span>
+                    </div>
+                  )
                 )}
               </div>
 
