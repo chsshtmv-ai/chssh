@@ -59,13 +59,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAdminLogin }) => {
     { id: 'track', labelKey: 'nav_track', defaultLabel: 'Track Submission', icon: Search }
   ];
 
+  const dynamicNavItems = [
+    ...mainNavItems,
+    ...(isAuthorLoggedIn && currentAuthor || activeTab === 'author-dashboard'
+      ? [{ id: 'author-dashboard', labelKey: 'nav_author_dashboard', defaultLabel: 'Author Dashboard', icon: User }]
+      : [])
+  ];
+
   // Include downloads if currently navigated to, ensuring route preservation
   const navItems = activeTab === 'downloads'
-    ? [...mainNavItems, { id: 'downloads', labelKey: 'nav_downloads', defaultLabel: 'Downloads', icon: Download }]
-    : mainNavItems;
+    ? [...dynamicNavItems, { id: 'downloads', labelKey: 'nav_downloads', defaultLabel: 'Downloads', icon: Download }]
+    : dynamicNavItems;
 
   const mobileNavItems = [
-    ...mainNavItems,
+    ...dynamicNavItems,
     { id: 'downloads', labelKey: 'nav_downloads', defaultLabel: 'Downloads', icon: Download }
   ];
 
@@ -201,14 +208,17 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAdminLogin }) => {
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => handleNavClick('submit')}
+                    onClick={() => handleNavClick('author-dashboard')}
                     className="text-[11px] px-2 py-0.5 rounded font-medium flex items-center gap-1.5 cursor-pointer transition bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40"
-                    title="Author Account active - click to access Submission Desk & Certificates"
+                    title="Author Account active - Click to open Author Dashboard"
                   >
                     <User className="w-3 h-3 text-emerald-400" />
                     <span className="max-w-[130px] truncate">{currentAuthor.name}</span>
                     <span className="text-[10px] font-mono text-emerald-400/80 hidden sm:inline">
                       ({currentAuthor.userId})
+                    </span>
+                    <span className="bg-emerald-500/20 text-emerald-200 text-[10px] px-1 py-0.2 rounded font-semibold ml-0.5">
+                      Dashboard
                     </span>
                   </button>
                   <button
@@ -385,13 +395,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAdminLogin }) => {
             <div className="pt-2 border-t border-[#1E3A63]/60 space-y-1">
               {isAuthorLoggedIn && currentAuthor ? (
                 <div className="flex items-center justify-between p-2.5 bg-emerald-950/70 border border-emerald-500/40 rounded text-emerald-300">
-                  <div className="flex items-center gap-2 text-xs">
-                    <User className="w-4 h-4 text-emerald-400" />
+                  <button
+                    type="button"
+                    onClick={() => handleNavClick('author-dashboard')}
+                    className="flex items-center gap-2 text-xs text-left cursor-pointer flex-1"
+                  >
+                    <User className="w-4 h-4 text-emerald-400 shrink-0" />
                     <div>
-                      <div className="font-bold">{currentAuthor.name}</div>
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>{currentAuthor.name}</span>
+                        <span className="text-[10px] bg-emerald-500/30 text-emerald-200 px-1 rounded">Dashboard</span>
+                      </div>
                       <div className="text-[10px] text-emerald-400/80 font-mono">User ID: {currentAuthor.userId}</div>
                     </div>
-                  </div>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {

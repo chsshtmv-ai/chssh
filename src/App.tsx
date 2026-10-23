@@ -17,6 +17,7 @@ import { ReviewersView } from './components/ReviewersView';
 import { SubmitManuscript } from './components/SubmitManuscript';
 import { TrackSubmission } from './components/TrackSubmission';
 import { DownloadsView } from './components/DownloadsView';
+import { AuthorDashboard } from './components/AuthorDashboard';
 import { AdminPanel } from './components/admin/AdminPanel';
 
 function JournalApp() {
@@ -56,6 +57,8 @@ function JournalApp() {
         return <TrackSubmission />;
       case 'downloads':
         return <DownloadsView />;
+      case 'author-dashboard':
+        return <AuthorDashboard />;
       case 'admin':
         return <AdminPanel />;
       default:

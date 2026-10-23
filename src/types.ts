@@ -90,6 +90,9 @@ export interface Article {
   driveUploadedAt?: string;
   driveResourceType?: 'pdf' | 'document' | 'spreadsheet' | 'presentation' | 'drive_file' | string;
   coverImage?: string;
+  // Publication Certificate Link (Google Drive)
+  certificateUrl?: string;
+  certificateUploadedAt?: string;
 }
 
 export interface JournalVolume {

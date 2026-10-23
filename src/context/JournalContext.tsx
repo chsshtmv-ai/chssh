@@ -195,6 +195,8 @@ interface JournalContextType {
     status?: 'active' | 'archived' | 'inactive';
   }) => Promise<JournalUploadedAsset>;
   updateArticle: (article: Article) => void;
+  updateArticleCertificate: (articleId: string, certificateUrl: string) => Promise<boolean>;
+  linkManuscriptToAuthor: (trackingId: string, authorUserId: string, authorEmail: string) => Promise<{ success: boolean; message: string }>;
   deleteArticle: (id: string) => void;
   incrementArticleViews: (id: string) => void;
   incrementArticleDownloads: (id: string) => void;
@@ -1144,6 +1146,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setTimeout(() => {
         actionToRun();
       }, 100);
+    } else {
+      setActiveTab('author-dashboard');
     }
     return { success: true };
   };
@@ -1193,6 +1197,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setTimeout(() => {
         actionToRun();
       }, 100);
+    } else {
+      setActiveTab('author-dashboard');
     }
     return { success: true };
   };
@@ -1247,6 +1253,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setCurrentAuthor(null);
     sessionStorage.removeItem('chssh_current_author');
     localStorage.removeItem('chssh_current_author');
+    if (activeTab === 'author-dashboard') {
+      setActiveTab('home');
+    }
   };
 
   const openAuthorAuthModal = (promptMessage?: string, onAuthenticated?: () => void) => {
@@ -2211,6 +2220,102 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (err) {
       console.warn('Firestore updateArticle error:', err);
     }
+  };
+
+  const updateArticleCertificate = async (articleId: string, certificateUrl: string): Promise<boolean> => {
+    if (!assertAdmin('updateArticleCertificate')) return false;
+    const trimmed = certificateUrl.trim();
+    const today = new Date().toISOString();
+    setArticles(prev =>
+      prev.map(art => {
+        if (art.id !== articleId) return art;
+        return {
+          ...art,
+          certificateUrl: trimmed || undefined,
+          certificateUploadedAt: trimmed ? today : undefined
+        };
+      })
+    );
+    try {
+      const artRef = doc(db, 'articles', articleId);
+      if (trimmed) {
+        await updateDoc(artRef, {
+          certificateUrl: trimmed,
+          certificateUploadedAt: today
+        });
+      } else {
+        await updateDoc(artRef, {
+          certificateUrl: deleteField(),
+          certificateUploadedAt: deleteField()
+        });
+      }
+      return true;
+    } catch (err) {
+      console.warn('Error updating certificate link in Firestore:', err);
+      return false;
+    }
+  };
+
+  const linkManuscriptToAuthor = async (
+    trackingId: string,
+    authorUserId: string,
+    authorEmail: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const cleanTracking = trackingId.trim().toUpperCase();
+    const cleanEmail = authorEmail.trim().toLowerCase();
+    const target = articles.find(
+      a => a.trackingId.toUpperCase() === cleanTracking
+    );
+
+    if (!target) {
+      return { success: false, message: `No manuscript found with tracking ID "${cleanTracking}".` };
+    }
+
+    const emailMatches = target.authors.some(
+      a => a.email && a.email.trim().toLowerCase() === cleanEmail
+    );
+    const userIdMatches = target.authorUserId === authorUserId;
+
+    if (!emailMatches && !userIdMatches) {
+      return {
+        success: false,
+        message: 'Security validation failed: The registered email on your account does not match the author email listed on this manuscript.'
+      };
+    }
+
+    const updatedArt: Article = {
+      ...target,
+      authorUserId
+    };
+
+    setArticles(prev => prev.map(a => (a.id === target.id ? updatedArt : a)));
+
+    try {
+      const artRef = doc(db, 'articles', target.id);
+      await updateDoc(artRef, { authorUserId });
+    } catch (err) {
+      console.warn('Firestore link manuscript error:', err);
+    }
+
+    if (currentAuthor) {
+      const existing = currentAuthor.submittedArticleIds || [];
+      if (!existing.includes(target.id)) {
+        const updatedAuthor = {
+          ...currentAuthor,
+          submittedArticleIds: [...existing, target.id]
+        };
+        setCurrentAuthor(updatedAuthor);
+        setAuthorAccounts(prev => prev.map(a => (a.id === currentAuthor.id ? updatedAuthor : a)));
+        try {
+          const authRef = doc(db, 'author_accounts', currentAuthor.id);
+          await updateDoc(authRef, { submittedArticleIds: updatedAuthor.submittedArticleIds });
+        } catch (err) {
+          console.warn('Firestore update author submitted articles error:', err);
+        }
+      }
+    }
+
+    return { success: true, message: `Manuscript ${target.trackingId} successfully linked to your dashboard!` };
   };
 
   const deleteArticle = (id: string) => {
@@ -3287,6 +3392,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         registerGoogleDrivePaper,
         registerGoogleDriveAsset,
         updateArticle,
+        updateArticleCertificate,
+        linkManuscriptToAuthor,
         deleteArticle,
         incrementArticleViews,
         incrementArticleDownloads,

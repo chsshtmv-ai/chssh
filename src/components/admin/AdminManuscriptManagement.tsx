@@ -26,7 +26,8 @@ import {
   CloudOff,
   RefreshCw,
   ExternalLink,
-  Folder
+  Folder,
+  Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArticleDoiBadge } from '../ArticleDoiBadge';
@@ -850,6 +851,58 @@ export const AdminManuscriptManagement: React.FC = () => {
                         <span>Open in Google Drive</span>
                       </a>
                     )}
+                  </div>
+                </div>
+
+                {/* Publication & Certificate Link Summary */}
+                <div className="p-3.5 bg-amber-50/60 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900 dark:text-amber-200 text-xs">
+                      <Award className="w-4 h-4 text-amber-600" />
+                      <span>Publication &amp; Certificate (Author Dashboard Sync)</span>
+                    </div>
+                    {selectedArticle.status === 'published' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                        Published
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                        Pending Publication
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-[11px] text-slate-600 dark:text-slate-300 space-y-1">
+                    <div>
+                      <span className="text-slate-400">Google Drive Certificate:</span>{' '}
+                      {selectedArticle.certificateUrl ? (
+                        <a
+                          href={selectedArticle.certificateUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-amber-700 dark:text-amber-400 hover:underline inline-flex items-center gap-1 ml-1"
+                        >
+                          <span>{selectedArticle.certificateUrl}</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                      ) : (
+                        <span className="text-slate-400 italic">No certificate link added yet</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsViewModalOpen(false);
+                        setAdminActiveSubTab('publication');
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-800 hover:bg-amber-900 text-white rounded-lg text-[11px] font-semibold cursor-pointer"
+                    >
+                      <Award className="w-3 h-3" />
+                      <span>Manage Publication &amp; Certificate in Publishing Tab</span>
+                    </button>
                   </div>
                 </div>
 
