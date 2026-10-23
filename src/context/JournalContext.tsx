@@ -82,8 +82,8 @@ interface JournalContextType {
   adminPassword: string;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes';
-  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes') => void;
+  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper';
+  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper') => void;
   openAdminAssetUploader: () => void;
   selectedArticleForView: Article | null;
   setSelectedArticleForView: (article: Article | null) => void;
@@ -176,6 +176,11 @@ interface JournalContextType {
   downloadOriginalManuscript: (article: Article) => Promise<void> | void;
   downloadPublishedPaper: (article: Article) => Promise<boolean> | boolean;
   viewPublishedPaper: (article: Article) => Promise<string | null>;
+  attachGoogleDrivePaper: (
+    articleId: string,
+    driveUrl: string,
+    metadata?: Partial<Article>
+  ) => Promise<Article>;
   registerGoogleDrivePaper: (data: {
     title: string;
     authors: Article['authors'];
@@ -433,7 +438,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [isLiveEditMode, setIsLiveEditMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('home');
-  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes'>('submissions');
+  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper'>('submissions');
   const [selectedArticleForView, setSelectedArticleForView] = useState<Article | null>(null);
 
   const [volumes, setVolumes] = useState<JournalVolume[]>(() => {
@@ -2186,6 +2191,149 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const attachGoogleDrivePaper = async (
+    articleId: string,
+    driveUrl: string,
+    metadata?: Partial<Article>
+  ): Promise<Article> => {
+    if (!assertAdmin('attachGoogleDrivePaper')) {
+      throw new Error('Admin authorization required to attach Google Drive paper.');
+    }
+    const cleanUrl = driveUrl.trim();
+    const parsed = parseGoogleDriveUrl(cleanUrl);
+    if (!parsed.isValid) {
+      throw new Error(parsed.error || 'Invalid Google Drive document URL.');
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const isNew = articleId === 'new' || !articles.some(a => a.id === articleId);
+    const targetId = isNew ? `art_${Date.now()}_${Math.random().toString(36).substring(2, 7)}` : articleId;
+    const trackingId = metadata?.trackingId || (isNew ? `CHSSH-${metadata?.year || new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}` : (articles.find(a => a.id === targetId)?.trackingId || `CHSSH-2026-${Math.floor(1000 + Math.random() * 9000)}`));
+
+    let resultingArticle: Article;
+
+    if (isNew) {
+      const newArt: Article = {
+        id: targetId,
+        trackingId,
+        title: metadata?.title || 'Published Research Paper',
+        abstract: metadata?.abstract || 'Scholarly research contribution published in Contemporary Horizons in Social Sciences and Humanities.',
+        keywords: metadata?.keywords || ['Social Sciences', 'Humanities', 'Peer Reviewed'],
+        track: metadata?.track || 'Sociology & Social Theory',
+        authors: metadata?.authors && metadata.authors.length > 0 ? metadata.authors : [{
+          id: `auth_${Date.now()}`,
+          name: 'Author Name',
+          affiliation: 'Institutional Affiliation',
+          email: '',
+          country: 'India',
+          isCorresponding: true
+        }],
+        submissionDate: today,
+        status: 'published',
+        volume: metadata?.volume || 7,
+        issue: metadata?.issue || 1,
+        year: metadata?.year || new Date().getFullYear(),
+        pages: metadata?.pages || '1–24',
+        doi: metadata?.doi || generateAcademicDoi(content.doi_prefix, {
+          year: metadata?.year || new Date().getFullYear(),
+          volume: metadata?.volume || 7,
+          issue: metadata?.issue || 1,
+          trackingId
+        }),
+        publishedDate: metadata?.publishedDate || today,
+        lastUpdatedDate: today,
+        driveUrl: cleanUrl,
+        driveFileId: parsed.fileId || '',
+        driveResourceType: parsed.resourceType,
+        publishedDownloadURL: parsed.downloadUrl || cleanUrl,
+        publishedFileName: `${trackingId}.pdf`,
+        publishedFileType: 'pdf',
+        publishedFileSize: 'Google Drive Document',
+        publishedUploadedAt: today,
+        certificateUrl: metadata?.certificateUrl,
+        viewsCount: 1,
+        downloadsCount: 0
+      };
+
+      resultingArticle = newArt;
+      setArticles(prev => [newArt, ...prev]);
+
+      try {
+        const artDocRef = doc(db, 'articles', targetId);
+        await setDoc(artDocRef, cleanForFirestore(newArt), { merge: true });
+      } catch (err) {
+        console.warn('Error saving new Google Drive paper to Firestore:', err);
+      }
+    } else {
+      let updatedArt: Article | undefined;
+      setArticles(prev =>
+        prev.map(art => {
+          if (art.id !== targetId) return art;
+          const updated: Article = {
+            ...art,
+            status: 'published',
+            publishedDate: metadata?.publishedDate || art.publishedDate || today,
+            lastUpdatedDate: today,
+            driveUrl: cleanUrl,
+            driveFileId: parsed.fileId || '',
+            driveResourceType: parsed.resourceType,
+            publishedDownloadURL: parsed.downloadUrl || cleanUrl,
+            publishedFileName: art.publishedFileName || `${art.trackingId}.pdf`,
+            publishedFileType: 'pdf',
+            publishedFileSize: art.publishedFileSize || 'Google Drive Document',
+            publishedUploadedAt: today,
+            ...(metadata?.title ? { title: metadata.title } : {}),
+            ...(metadata?.authors ? { authors: metadata.authors } : {}),
+            ...(metadata?.abstract ? { abstract: metadata.abstract } : {}),
+            ...(metadata?.track ? { track: metadata.track } : {}),
+            ...(metadata?.volume !== undefined ? { volume: metadata.volume } : {}),
+            ...(metadata?.issue !== undefined ? { issue: metadata.issue } : {}),
+            ...(metadata?.year !== undefined ? { year: metadata.year } : {}),
+            ...(metadata?.pages ? { pages: metadata.pages } : {}),
+            ...(metadata?.doi ? { doi: metadata.doi } : {}),
+            ...(metadata?.certificateUrl !== undefined ? { certificateUrl: metadata.certificateUrl } : {})
+          };
+          updatedArt = updated;
+
+          try {
+            const artDocRef = doc(db, 'articles', targetId);
+            updateDoc(artDocRef, cleanForFirestore({
+              status: 'published',
+              publishedDate: updated.publishedDate,
+              lastUpdatedDate: today,
+              driveUrl: cleanUrl,
+              driveFileId: parsed.fileId || '',
+              driveResourceType: parsed.resourceType,
+              publishedDownloadURL: parsed.downloadUrl || cleanUrl,
+              publishedFileName: updated.publishedFileName,
+              publishedFileType: 'pdf',
+              publishedFileSize: updated.publishedFileSize,
+              publishedUploadedAt: today,
+              ...(metadata?.title ? { title: metadata.title } : {}),
+              ...(metadata?.authors ? { authors: metadata.authors } : {}),
+              ...(metadata?.abstract ? { abstract: metadata.abstract } : {}),
+              ...(metadata?.track ? { track: metadata.track } : {}),
+              ...(metadata?.volume !== undefined ? { volume: metadata.volume } : {}),
+              ...(metadata?.issue !== undefined ? { issue: metadata.issue } : {}),
+              ...(metadata?.year !== undefined ? { year: metadata.year } : {}),
+              ...(metadata?.pages ? { pages: metadata.pages } : {}),
+              ...(metadata?.doi ? { doi: metadata.doi } : {}),
+              ...(metadata?.certificateUrl !== undefined ? { certificateUrl: metadata.certificateUrl } : {})
+            })).catch(err => {
+              console.warn('Error updating Google Drive paper in Firestore:', err);
+            });
+          } catch (err) {
+            console.warn('Firestore attachGoogleDrivePaper error:', err);
+          }
+          return updated;
+        })
+      );
+      resultingArticle = updatedArt || articles.find(a => a.id === targetId)!;
+    }
+
+    return resultingArticle;
+  };
+
   const registerGoogleDrivePaper = async (data: {
     title: string;
     authors: Article['authors'];
@@ -3477,6 +3625,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         downloadOriginalManuscript,
         downloadPublishedPaper,
         viewPublishedPaper,
+        attachGoogleDrivePaper,
         registerGoogleDrivePaper,
         registerGoogleDriveAsset,
         updateArticle,

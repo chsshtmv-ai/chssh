@@ -386,6 +386,25 @@ export const HomeHero: React.FC = () => {
                   {article.abstract}
                 </p>
 
+                {/* Published Paper Google Drive Link if provided by Admin */}
+                {article.driveUrl && (
+                  <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-sky-50/90 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-850 text-xs">
+                    <span className="font-semibold text-slate-800 dark:text-slate-200 shrink-0">
+                      Drive Link:
+                    </span>
+                    <a
+                      href={article.driveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sky-700 dark:text-sky-300 hover:text-sky-900 dark:hover:text-sky-100 hover:underline font-mono text-[11px] flex items-center gap-1.5 break-all"
+                      title={`Open uploaded paper in Google Drive: ${article.driveUrl}`}
+                    >
+                      <span className="truncate max-w-xs sm:max-w-md">{article.driveUrl}</span>
+                      <ExternalLink className="w-3 h-3 shrink-0" />
+                    </a>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex flex-wrap gap-1.5">
                     {article.keywords.slice(0, 4).map((kw, i) => (
@@ -428,8 +447,20 @@ export const HomeHero: React.FC = () => {
                       </button>
                     )}
 
-                    {/* Download Published Paper PDF (Active when admin has uploaded published paper) */}
-                    {hasUploadedPublishedPaper(article) ? (
+                    {/* Download Published Paper PDF (Active when admin has uploaded paper via Drive or local file) */}
+                    {article.driveUrl ? (
+                      <a
+                        href={article.driveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-2xs transition cursor-pointer"
+                        title={`Download official finalized published paper from Google Drive (${article.driveUrl})`}
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>Download Paper</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-80" />
+                      </a>
+                    ) : hasUploadedPublishedPaper(article) ? (
                       <button
                         type="button"
                         onClick={() => downloadPublishedPaper(article)}
@@ -443,7 +474,7 @@ export const HomeHero: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setSelectedArticleForView(article)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 dark:bg-stone-800 text-slate-500 dark:text-slate-400 rounded-lg text-xs font-medium border border-stone-200 dark:border-stone-700 cursor-pointer"
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-stone-100 dark:bg-stone-800 text-slate-500 dark:text-slate-400 rounded-lg text-xs font-medium border border-stone-200 dark:border-stone-700 cursor-pointer"
                         title="Your published paper will be available here after official publication by the editorial team."
                       >
                         <Clock className="w-3.5 h-3.5" />

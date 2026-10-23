@@ -125,6 +125,9 @@ export const AuthorDashboard: React.FC = () => {
     (activeArticle.publishedDownloadURL ||
       activeArticle.publishedFileDataUrl ||
       activeArticle.publishedFileName ||
+      activeArticle.driveUrl ||
+      activeArticle.driveFileId ||
+      activeArticle.publishedStoragePath ||
       (typeof window !== 'undefined' && localStorage.getItem(`chssh_pub_file_${activeArticle.id}`)))
   );
   const isDownloadPaperActive = Boolean(isPaperPublished && hasUploadedPublishedPdf);
@@ -645,16 +648,48 @@ export const AuthorDashboard: React.FC = () => {
                       )}
                     </div>
 
+                    {/* Published Paper Google Drive Link if provided by Admin */}
+                    {activeArticle.driveUrl && (
+                      <div className="flex flex-wrap items-center justify-center gap-2 p-3 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-xs max-w-lg mx-auto">
+                        <span className="font-semibold text-slate-800 dark:text-slate-200 shrink-0">
+                          Drive Link:
+                        </span>
+                        <a
+                          href={activeArticle.driveUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sky-700 dark:text-sky-300 hover:underline font-mono text-[11px] truncate flex items-center gap-1 max-w-xs"
+                          title={activeArticle.driveUrl}
+                        >
+                          <span className="truncate">{activeArticle.driveUrl}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      </div>
+                    )}
+
                     {/* Direct Download Button */}
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        onClick={() => downloadPublishedPaper(activeArticle)}
-                        className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition cursor-pointer hover:shadow-md"
-                      >
-                        <Download className="w-4 h-4" />
-                        <span>Download Final Published Paper (PDF)</span>
-                      </button>
+                    <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                      {activeArticle.driveUrl ? (
+                        <a
+                          href={activeArticle.driveUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition cursor-pointer hover:shadow-md"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Download Paper via Google Drive</span>
+                          <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => downloadPublishedPaper(activeArticle)}
+                          className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-sm transition cursor-pointer hover:shadow-md"
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Download Final Published Paper (PDF)</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (

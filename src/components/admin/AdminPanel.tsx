@@ -42,6 +42,7 @@ import { AdminReviewersPanel } from './AdminReviewersPanel';
 import { AdminManuscriptDownloads } from './AdminManuscriptDownloads';
 import { AdminPublicationSection } from './AdminPublicationSection';
 import { AdminGoogleDriveRegistrar } from './AdminGoogleDriveRegistrar';
+import { AdminGoogleDrivePaperUpload } from './AdminGoogleDrivePaperUpload';
 import { AdminVolumeIssueManagement } from './AdminVolumeIssueManagement';
 import { AdminManuscriptManagement } from './AdminManuscriptManagement';
 import { DocumentPreviewModal } from '../DocumentPreviewModal';
@@ -539,6 +540,19 @@ export const AdminPanel: React.FC = () => {
           >
             <FolderOpen className="w-3.5 h-3.5 text-sky-400" />
             <span>Google Drive Manager</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAdminActiveSubTab('drive-paper')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer ${
+              adminActiveSubTab === 'drive-paper'
+                ? 'bg-[#102344] text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-stone-800'
+            }`}
+          >
+            <FolderOpen className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="font-medium text-emerald-600 dark:text-emerald-400">Upload Paper via Drive</span>
           </button>
 
           <button
@@ -1172,6 +1186,9 @@ export const AdminPanel: React.FC = () => {
 
       {/* SUBTAB: Google Drive Manager */}
       {adminActiveSubTab === 'drive' && <AdminGoogleDriveRegistrar />}
+
+      {/* SUBTAB: Upload Paper via Google Drive */}
+      {adminActiveSubTab === 'drive-paper' && <AdminGoogleDrivePaperUpload />}
 
       {/* SUBTAB: Security & SMS */}
       {adminActiveSubTab === 'security' && (

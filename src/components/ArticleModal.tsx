@@ -212,6 +212,20 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
                     <span className="font-bold">{article.publishedFileName || (isGoogleDriveArticle ? 'Google Drive Document' : 'Published_Paper.pdf')}</span>
                     <span className="text-stone-500">({isGoogleDriveArticle ? 'Google Drive Cloud' : (article.publishedFileSize || '1.8 MB')})</span>
                   </div>
+                  {article.driveUrl && (
+                    <div className="pt-1.5">
+                      <a
+                        href={article.driveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-mono text-sky-700 dark:text-sky-300 hover:underline break-all"
+                        title={article.driveUrl}
+                      >
+                        <ExternalLink className="w-3 h-3 shrink-0" />
+                        <span className="truncate max-w-sm sm:max-w-md">{article.driveUrl}</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <motion.button
