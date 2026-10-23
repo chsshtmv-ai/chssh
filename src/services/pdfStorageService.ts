@@ -92,7 +92,7 @@ async function attemptFirebaseStorageUpload(
 /**
  * Saves large PDF base64 data to Firestore across chunk documents
  */
-async function saveLargePdfToFirestoreChunks(
+export async function saveLargePdfToFirestoreChunks(
   slotId: string,
   fileDataUrl: string,
   onStatusChange?: (status: string) => void
@@ -117,7 +117,7 @@ async function saveLargePdfToFirestoreChunks(
 /**
  * Reads all chunk documents from Firestore and reassembles the complete PDF data URL
  */
-async function readLargePdfFromFirestoreChunks(
+export async function readLargePdfFromFirestoreChunks(
   slotId: string,
   totalParts: number,
   chunkPrefix?: string

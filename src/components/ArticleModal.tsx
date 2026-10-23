@@ -88,14 +88,12 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDownloadPublished = () => {
-    requireAuthorAuth(async () => {
-      const success = await downloadPublishedPaper(article);
-      if (success) {
-        setDownloadSuccess(true);
-        setTimeout(() => setDownloadSuccess(false), 3500);
-      }
-    }, 'Author Login Required: Please log in with your User ID and Password to download the published research paper.');
+  const handleDownloadPublished = async () => {
+    const success = await downloadPublishedPaper(article);
+    if (success) {
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 3500);
+    }
   };
 
   return (
