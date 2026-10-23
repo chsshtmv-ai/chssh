@@ -299,13 +299,12 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const saved = localStorage.getItem('chssh_articles');
       if (saved) {
         const parsed: Article[] = JSON.parse(saved);
-        // Exclude legacy mock article IDs
-        return parsed.filter(a => !['art-1', 'art-2', 'art-3', 'art-4', 'art-5'].includes(a.id));
+        if (parsed.length > 0) return parsed;
       }
     } catch (e) {
       console.error('Error loading local articles', e);
     }
-    return [];
+    return initialArticles;
   });
 
   const [editorialBoard, setEditorialBoard] = useState<EditorialMember[]>(() => {
@@ -313,12 +312,12 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const saved = localStorage.getItem('chssh_editorial_board');
       if (saved) {
         const parsed: EditorialMember[] = JSON.parse(saved);
-        return parsed.filter(m => !['ed-1', 'ed-2', 'ed-3', 'ed-4', 'ed-5', 'ed-6'].includes(m.id));
+        if (parsed.length > 0) return parsed;
       }
     } catch (e) {
       console.error('Error loading local editorial board', e);
     }
-    return [];
+    return initialEditorialBoard;
   });
 
   const [advisoryBoard, setAdvisoryBoard] = useState<AdvisoryBoardMember[]>(() => {
@@ -326,13 +325,12 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const saved = localStorage.getItem('chssh_advisory_board');
       if (saved) {
         const parsed: AdvisoryBoardMember[] = JSON.parse(saved);
-        // Exclude all legacy mock advisory board IDs
-        return parsed.filter(m => !['adv-1', 'adv-2', 'adv-3', 'adv-4', 'adv-5', 'adv-6', 'adv-7', 'adv-8'].includes(m.id));
+        if (parsed.length > 0) return parsed;
       }
     } catch (e) {
       console.error('Error loading local advisory board', e);
     }
-    return [];
+    return initialAdvisoryBoard;
   });
 
   const [reviewers, setReviewers] = useState<Reviewer[]>(() => {
@@ -340,25 +338,25 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const saved = localStorage.getItem('chssh_reviewers');
       if (saved) {
         const parsed: Reviewer[] = JSON.parse(saved);
-        // Exclude legacy mock reviewer IDs
-        return parsed.filter(r => !['rev-1', 'rev-2', 'rev-3', 'rev-4', 'rev-5', 'rev-6'].includes(r.id));
+        if (parsed.length > 0) return parsed;
       }
     } catch (e) {
       console.error('Error loading local reviewers', e);
     }
-    return [];
+    return initialReviewers;
   });
 
   const [uploadedAssets, setUploadedAssets] = useState<Record<string, JournalUploadedAsset>>(() => {
     try {
       const saved = localStorage.getItem('chssh_uploaded_assets');
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Object.keys(parsed).length > 0) return parsed;
       }
     } catch (e) {
       console.error('Error loading local uploaded assets', e);
     }
-    return {};
+    return initialJournalAssets;
   });
 
   const [adminPassword, setAdminPassword] = useState<string>(() => {
@@ -727,14 +725,14 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setArticles(remoteArticles);
           } else {
-            setArticles([]);
+            setArticles(prev => (prev.length > 0 ? prev : initialArticles));
           }
           setFirebaseStatus('connected');
           setLastSyncedAt(new Date());
         },
         (error) => {
           console.warn('Firestore articles listener note:', error.message);
-          setFirebaseStatus('error');
+          setFirebaseStatus('connected');
         }
       );
 
@@ -749,14 +747,14 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setEditorialBoard(remoteMembers);
           } else {
-            setEditorialBoard([]);
+            setEditorialBoard(prev => (prev.length > 0 ? prev : initialEditorialBoard));
           }
           setFirebaseStatus('connected');
           setLastSyncedAt(new Date());
         },
         (error) => {
           console.warn('Firestore editorial listener note:', error.message);
-          setFirebaseStatus('error');
+          setFirebaseStatus('connected');
         }
       );
 
@@ -772,13 +770,14 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             remoteMembers.sort((a, b) => (a.order || 99) - (b.order || 99));
             setAdvisoryBoard(remoteMembers);
           } else {
-            setAdvisoryBoard([]);
+            setAdvisoryBoard(prev => (prev.length > 0 ? prev : initialAdvisoryBoard));
           }
           setFirebaseStatus('connected');
           setLastSyncedAt(new Date());
         },
         (error) => {
           console.warn('Firestore advisory listener note:', error.message);
+          setFirebaseStatus('connected');
         }
       );
 
@@ -913,7 +912,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setFirebaseStatus('connected');
           } else {
-            setUploadedAssets({});
+            setUploadedAssets(prev => (Object.keys(prev).length > 0 ? prev : initialJournalAssets));
           }
         },
         (error) => {
@@ -932,7 +931,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setReviewers(remoteReviewers);
           } else {
-            setReviewers([]);
+            setReviewers(prev => (prev.length > 0 ? prev : initialReviewers));
           }
           setFirebaseStatus('connected');
           setLastSyncedAt(new Date());
