@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { JournalContent, Article, EditorialMember, AdvisoryBoardMember, ArticleStatus, JournalUploadedAsset, Reviewer, AuthorAccount, JournalPalette } from '../types';
+import { JournalContent, Article, EditorialMember, AdvisoryBoardMember, ArticleStatus, JournalUploadedAsset, Reviewer, AuthorAccount, JournalPalette, JournalVolume, JournalIssue } from '../types';
 import { initialJournalContent } from '../data/defaultContent';
 import { initialArticles, initialEditorialBoard } from '../data/defaultArticles';
 import { initialAdvisoryBoard } from '../data/defaultAdvisoryBoard';
 import { initialJournalAssets } from '../data/defaultAssets';
 import { initialReviewers } from '../data/defaultReviewers';
 import { initialAuthors, normalizePhoneNumber } from '../data/defaultAuthors';
+import { initialVolumes, initialIssues } from '../data/defaultVolumes';
 import { db, firebaseConfig } from '../lib/firebase';
 import {
   collection,
@@ -54,6 +55,16 @@ import {
   validatePdfFile,
   getFreshPdfUrl
 } from '../services/pdfStorageService';
+import {
+  initDriveAuth,
+  connectGoogleDrive,
+  disconnectGoogleDrive,
+  isDriveConnected,
+  uploadManuscriptToGoogleDrive,
+  moveManuscriptInGoogleDrive,
+  ensureJournalFolderStructure
+} from '../services/googleDriveService';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 export type FirebaseConnectionStatus = 'connected' | 'connecting' | 'error' | 'syncing';
 
@@ -69,8 +80,8 @@ interface JournalContextType {
   adminPassword: string;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive';
-  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive') => void;
+  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes';
+  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes') => void;
   openAdminAssetUploader: () => void;
   selectedArticleForView: Article | null;
   setSelectedArticleForView: (article: Article | null) => void;
@@ -219,6 +230,31 @@ interface JournalContextType {
   openAuthorAuthModal: (promptMessage?: string, onAuthenticated?: () => void) => void;
   closeAuthorAuthModal: () => void;
   requireAuthorAuth: (action: () => void, promptMessage?: string) => void;
+  // Volume & Issue Management
+  volumes: JournalVolume[];
+  issues: JournalIssue[];
+  createVolume: (data: Omit<JournalVolume, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; error?: string; volume?: JournalVolume }>;
+  updateVolume: (id: string, updates: Partial<JournalVolume>) => Promise<boolean>;
+  deleteVolume: (id: string) => Promise<boolean>;
+  createIssue: (data: Omit<JournalIssue, 'id' | 'createdAt' | 'updatedAt'>) => Promise<{ success: boolean; error?: string; issue?: JournalIssue }>;
+  updateIssue: (id: string, updates: Partial<JournalIssue>) => Promise<boolean>;
+  deleteIssue: (id: string) => Promise<boolean>;
+  publishIssue: (issueId: string) => Promise<{ success: boolean; error?: string }>;
+  unpublishIssue: (issueId: string) => Promise<boolean>;
+  reorderArticlesInIssue: (issueId: string, articleIds: string[]) => Promise<boolean>;
+  addArticleToIssue: (issueId: string, articleId: string) => Promise<boolean>;
+  removeArticleFromIssue: (issueId: string, articleId: string) => Promise<boolean>;
+  // Manuscript Review & Workflow
+  assignReviewerToArticle: (articleId: string, reviewerId: string, reviewerName: string) => void;
+  requestArticleRevision: (articleId: string, instructions: string) => void;
+  exportSubmissionsCsv: () => void;
+  // Google Drive Integration
+  isGoogleDriveConnected: boolean;
+  googleDriveUser: FirebaseUser | null;
+  connectDrive: () => Promise<{ success: boolean; error?: string }>;
+  disconnectDrive: () => Promise<void>;
+  syncManuscriptToGoogleDrive: (articleId: string) => Promise<boolean>;
+  ensureDriveFolderTree: () => Promise<boolean>;
   // Backup / Sync & Firebase
   exportAllData: () => string;
   importAllData: (jsonStr: string) => boolean;
@@ -390,8 +426,34 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [isLiveEditMode, setIsLiveEditMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('home');
-  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive'>('submissions');
+  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes'>('submissions');
   const [selectedArticleForView, setSelectedArticleForView] = useState<Article | null>(null);
+
+  const [volumes, setVolumes] = useState<JournalVolume[]>(() => {
+    try {
+      const saved = localStorage.getItem('chssh_journal_volumes');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Error loading local volumes', e);
+    }
+    return initialVolumes;
+  });
+
+  const [issues, setIssues] = useState<JournalIssue[]>(() => {
+    try {
+      const saved = localStorage.getItem('chssh_journal_issues');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Error loading local issues', e);
+    }
+    return initialIssues;
+  });
 
   const openAdminAssetUploader = () => {
     setAdminActiveSubTab('assets');
@@ -479,6 +541,25 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const [isGoogleDriveConnected, setIsGoogleDriveConnected] = useState<boolean>(() => isDriveConnected());
+  const [googleDriveUser, setGoogleDriveUser] = useState<FirebaseUser | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = initDriveAuth(
+      (user) => {
+        setGoogleDriveUser(user);
+        setIsGoogleDriveConnected(true);
+      },
+      () => {
+        setGoogleDriveUser(null);
+        setIsGoogleDriveConnected(false);
+      }
+    );
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   useEffect(() => {
     purgeLegacyFilesFromLocalStorage();
   }, []);
@@ -547,6 +628,16 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     safeLocalStorageSet('chssh_author_accounts', JSON.stringify(authorAccounts));
   }, [authorAccounts]);
+
+  useEffect(() => {
+    safeLocalStorageSet('chssh_journal_volumes', JSON.stringify(volumes));
+    broadcastSync('SYNC_VOLUMES', volumes);
+  }, [volumes]);
+
+  useEffect(() => {
+    safeLocalStorageSet('chssh_journal_issues', JSON.stringify(issues));
+    broadcastSync('SYNC_ISSUES', issues);
+  }, [issues]);
 
   useEffect(() => {
     try {
@@ -674,6 +765,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let unsubscribeAssets: (() => void) | undefined;
     let unsubscribeJournalAssets: (() => void) | undefined;
     let unsubscribeAuthors: (() => void) | undefined;
+    let unsubscribeVolumes: (() => void) | undefined;
+    let unsubscribeIssues: (() => void) | undefined;
 
     try {
       const contentDocRef = doc(db, 'journal_content', 'main');
@@ -961,6 +1054,49 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
           console.warn('Firestore author_accounts listener note:', error.message);
         }
       );
+
+      const volumesColRef = collection(db, 'journal_volumes');
+      unsubscribeVolumes = onSnapshot(
+        volumesColRef,
+        (snap) => {
+          if (!snap.empty) {
+            const remoteVolumes: JournalVolume[] = [];
+            snap.forEach((docItem) => {
+              remoteVolumes.push(docItem.data() as JournalVolume);
+            });
+            remoteVolumes.sort((a, b) => b.volumeNumber - a.volumeNumber);
+            setVolumes(remoteVolumes);
+          } else {
+            setVolumes(prev => (prev.length > 0 ? prev : initialVolumes));
+          }
+        },
+        (error) => {
+          console.warn('Firestore journal_volumes listener note:', error.message);
+        }
+      );
+
+      const issuesColRef = collection(db, 'journal_issues');
+      unsubscribeIssues = onSnapshot(
+        issuesColRef,
+        (snap) => {
+          if (!snap.empty) {
+            const remoteIssues: JournalIssue[] = [];
+            snap.forEach((docItem) => {
+              remoteIssues.push(docItem.data() as JournalIssue);
+            });
+            remoteIssues.sort((a, b) => {
+              if (b.volumeNumber !== a.volumeNumber) return b.volumeNumber - a.volumeNumber;
+              return b.issueNumber - a.issueNumber;
+            });
+            setIssues(remoteIssues);
+          } else {
+            setIssues(prev => (prev.length > 0 ? prev : initialIssues));
+          }
+        },
+        (error) => {
+          console.warn('Firestore journal_issues listener note:', error.message);
+        }
+      );
     } catch (e) {
       console.warn('Firebase initialization error:', e);
       setFirebaseStatus('error');
@@ -978,6 +1114,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (unsubscribeAssets) unsubscribeAssets();
       if (unsubscribeJournalAssets) unsubscribeJournalAssets();
       if (unsubscribeAuthors) unsubscribeAuthors();
+      if (unsubscribeVolumes) unsubscribeVolumes();
+      if (unsubscribeIssues) unsubscribeIssues();
     };
   }, []);
 
@@ -1453,8 +1591,11 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       conflictOfInterest: data.conflictOfInterest ?? false,
       editorialNotes: 'Manuscript received and queued for editorial preliminary assessment.',
       reviewerComments: [],
+      storageStatus: 'stored_locally',
       viewsCount: 0,
-      downloadsCount: 0
+      downloadsCount: 0,
+      driveUploadStatus: isDriveConnected() ? 'pending' : 'pending',
+      driveUploadError: isDriveConnected() ? undefined : 'Pending Google Drive connection with chsshtmv@gmail.com'
     };
 
     if (currentAuthor) {
@@ -1472,6 +1613,55 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     if (data.fileDataUrl) {
       saveOriginalManuscriptFile(newArticle.id, data.fileDataUrl).catch(e => console.warn(e));
+
+      // Automatic upload to Google Drive account chsshtmv@gmail.com
+      if (isDriveConnected()) {
+        const payloadDataUrl = data.fileDataUrl;
+        uploadManuscriptToGoogleDrive(
+          {
+            dataUrl: payloadDataUrl,
+            originalFileName: newArticle.fileName,
+            mimeType: detectMimeType(newArticle.fileName || 'manuscript.docx')
+          },
+          {
+            trackingId: newArticle.trackingId,
+            title: newArticle.title,
+            year,
+            status: newArticle.status
+          }
+        ).then(async (driveRes) => {
+          if (driveRes.success && driveRes.fileId) {
+            const driveSuccess: Partial<Article> = {
+              driveFileId: driveRes.fileId,
+              driveFolderId: driveRes.folderId,
+              driveUploadStatus: 'uploaded',
+              driveUploadedAt: new Date().toISOString(),
+              driveUploadError: undefined
+            };
+            setArticles(prev => prev.map(a => a.id === newArticle.id ? { ...a, ...driveSuccess } : a));
+            try {
+              const artRef = doc(db, 'articles', newArticle.id);
+              await updateDoc(artRef, cleanForFirestore(driveSuccess));
+            } catch (err) {
+              console.warn('Error saving drive metadata to Firestore:', err);
+            }
+          } else {
+            const driveFail: Partial<Article> = {
+              driveUploadStatus: 'failed',
+              driveUploadError: driveRes.error || 'Failed to upload to Google Drive'
+            };
+            setArticles(prev => prev.map(a => a.id === newArticle.id ? { ...a, ...driveFail } : a));
+            try {
+              const artRef = doc(db, 'articles', newArticle.id);
+              await updateDoc(artRef, cleanForFirestore(driveFail));
+            } catch (err) {
+              console.warn('Error saving drive failure to Firestore:', err);
+            }
+          }
+        }).catch(err => {
+          console.warn('Drive upload error:', err);
+        });
+      }
     }
 
     setArticles(prev => [newArticle, ...prev]);
@@ -1499,6 +1689,18 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
   ) => {
     if (!assertAdmin('updateArticleStatus')) return;
     const today = new Date().toISOString().split('T')[0];
+
+    // Trigger Google Drive folder relocation if file exists on Drive
+    const targetArt = articles.find(a => a.id === id);
+    if (targetArt && targetArt.driveFileId && targetArt.status !== status) {
+      const subYear = targetArt.submissionDate ? parseInt(targetArt.submissionDate.split('-')[0], 10) : new Date().getFullYear();
+      moveManuscriptInGoogleDrive(
+        targetArt.driveFileId,
+        targetArt.status,
+        status,
+        isNaN(subYear) ? new Date().getFullYear() : subYear
+      ).catch(err => console.warn('Drive move file notice:', err));
+    }
     
     setArticles(prev =>
       prev.map(art => {
@@ -2026,6 +2228,484 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  // Volume Management
+  const createVolume = async (
+    data: Omit<JournalVolume, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<{ success: boolean; error?: string; volume?: JournalVolume }> => {
+    if (!assertAdmin('createVolume')) return { success: false, error: 'Unauthorized' };
+
+    const existing = volumes.find(
+      v => Number(v.volumeNumber) === Number(data.volumeNumber) && Number(v.year) === Number(data.year)
+    );
+    if (existing) {
+      return {
+        success: false,
+        error: `Volume ${data.volumeNumber} already exists for publication year ${data.year}. Please edit the existing volume or choose a different number.`
+      };
+    }
+
+    const now = new Date().toISOString();
+    const newVol: JournalVolume = {
+      ...data,
+      volumeNumber: Number(data.volumeNumber),
+      year: Number(data.year),
+      id: `vol-${Date.now()}`,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    setVolumes(prev => [newVol, ...prev].sort((a, b) => b.volumeNumber - a.volumeNumber));
+
+    try {
+      const volRef = doc(db, 'journal_volumes', newVol.id);
+      await setDoc(volRef, cleanForFirestore(newVol));
+    } catch (err) {
+      console.warn('Error saving volume to Firestore:', err);
+    }
+    return { success: true, volume: newVol };
+  };
+
+  const updateVolume = async (id: string, updates: Partial<JournalVolume>): Promise<boolean> => {
+    if (!assertAdmin('updateVolume')) return false;
+    const now = new Date().toISOString();
+
+    setVolumes(prev =>
+      prev.map(v => (v.id === id ? { ...v, ...updates, updatedAt: now } : v))
+    );
+
+    try {
+      const volRef = doc(db, 'journal_volumes', id);
+      await updateDoc(volRef, cleanForFirestore({ ...updates, updatedAt: now }));
+      return true;
+    } catch (err) {
+      console.warn('Error updating volume in Firestore:', err);
+      return false;
+    }
+  };
+
+  const deleteVolume = async (id: string): Promise<boolean> => {
+    if (!assertAdmin('deleteVolume')) return false;
+    setVolumes(prev => prev.filter(v => v.id !== id));
+    try {
+      const volRef = doc(db, 'journal_volumes', id);
+      await deleteDoc(volRef);
+      return true;
+    } catch (err) {
+      console.warn('Error deleting volume from Firestore:', err);
+      return false;
+    }
+  };
+
+  // Issue Management
+  const createIssue = async (
+    data: Omit<JournalIssue, 'id' | 'createdAt' | 'updatedAt'>
+  ): Promise<{ success: boolean; error?: string; issue?: JournalIssue }> => {
+    if (!assertAdmin('createIssue')) return { success: false, error: 'Unauthorized' };
+
+    const existing = issues.find(
+      i => Number(i.volumeNumber) === Number(data.volumeNumber) && Number(i.issueNumber) === Number(data.issueNumber)
+    );
+    if (existing) {
+      return {
+        success: false,
+        error: `Issue ${data.issueNumber} already exists in Volume ${data.volumeNumber}.`
+      };
+    }
+
+    const now = new Date().toISOString();
+    const newIssue: JournalIssue = {
+      ...data,
+      volumeNumber: Number(data.volumeNumber),
+      issueNumber: Number(data.issueNumber),
+      year: Number(data.year),
+      id: `issue-${Date.now()}`,
+      articleIds: data.articleIds || [],
+      status: data.status || 'draft',
+      isCurrent: Boolean(data.isCurrent),
+      createdAt: now,
+      updatedAt: now
+    };
+
+    setIssues(prev => [newIssue, ...prev]);
+
+    try {
+      const issueRef = doc(db, 'journal_issues', newIssue.id);
+      await setDoc(issueRef, cleanForFirestore(newIssue));
+    } catch (err) {
+      console.warn('Error saving issue to Firestore:', err);
+    }
+    return { success: true, issue: newIssue };
+  };
+
+  const updateIssue = async (id: string, updates: Partial<JournalIssue>): Promise<boolean> => {
+    if (!assertAdmin('updateIssue')) return false;
+    const now = new Date().toISOString();
+
+    setIssues(prev =>
+      prev.map(i => (i.id === id ? { ...i, ...updates, updatedAt: now } : i))
+    );
+
+    try {
+      const issueRef = doc(db, 'journal_issues', id);
+      await updateDoc(issueRef, cleanForFirestore({ ...updates, updatedAt: now }));
+      return true;
+    } catch (err) {
+      console.warn('Error updating issue in Firestore:', err);
+      return false;
+    }
+  };
+
+  const deleteIssue = async (id: string): Promise<boolean> => {
+    if (!assertAdmin('deleteIssue')) return false;
+    setIssues(prev => prev.filter(i => i.id !== id));
+    try {
+      const issueRef = doc(db, 'journal_issues', id);
+      await deleteDoc(issueRef);
+      return true;
+    } catch (err) {
+      console.warn('Error deleting issue from Firestore:', err);
+      return false;
+    }
+  };
+
+  const publishIssue = async (issueId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('publishIssue')) return { success: false, error: 'Unauthorized' };
+    const target = issues.find(i => i.id === issueId);
+    if (!target) return { success: false, error: 'Issue not found' };
+
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+
+    const updatedIssues = issues.map(iss => {
+      if (iss.id === issueId) {
+        return {
+          ...iss,
+          status: 'published' as const,
+          isCurrent: true,
+          publicationDate: iss.publicationDate || today,
+          updatedAt: now
+        };
+      } else if (iss.isCurrent || iss.status === 'published') {
+        return {
+          ...iss,
+          isCurrent: false,
+          status: 'archived' as const,
+          updatedAt: now
+        };
+      }
+      return iss;
+    });
+
+    setIssues(updatedIssues);
+
+    if (target.articleIds && target.articleIds.length > 0) {
+      setArticles(prev =>
+        prev.map(art => {
+          if (target.articleIds.includes(art.id)) {
+            return {
+              ...art,
+              status: 'published',
+              volume: target.volumeNumber,
+              issue: target.issueNumber,
+              year: target.year,
+              publishedDate: art.publishedDate || today
+            };
+          }
+          return art;
+        })
+      );
+    }
+
+    try {
+      const batch = writeBatch(db);
+      updatedIssues.forEach(iss => {
+        const ref = doc(db, 'journal_issues', iss.id);
+        batch.set(ref, cleanForFirestore(iss), { merge: true });
+      });
+      await batch.commit();
+    } catch (err) {
+      console.warn('Firestore publishIssue error:', err);
+    }
+
+    return { success: true };
+  };
+
+  const unpublishIssue = async (issueId: string): Promise<boolean> => {
+    if (!assertAdmin('unpublishIssue')) return false;
+    const now = new Date().toISOString();
+    setIssues(prev =>
+      prev.map(iss =>
+        iss.id === issueId ? { ...iss, status: 'draft', isCurrent: false, updatedAt: now } : iss
+      )
+    );
+    try {
+      const issueRef = doc(db, 'journal_issues', issueId);
+      await updateDoc(issueRef, { status: 'draft', isCurrent: false, updatedAt: now });
+      return true;
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  };
+
+  const reorderArticlesInIssue = async (issueId: string, articleIds: string[]): Promise<boolean> => {
+    if (!assertAdmin('reorderArticlesInIssue')) return false;
+    const now = new Date().toISOString();
+    setIssues(prev =>
+      prev.map(iss => (iss.id === issueId ? { ...iss, articleIds, updatedAt: now } : iss))
+    );
+    try {
+      const issueRef = doc(db, 'journal_issues', issueId);
+      await updateDoc(issueRef, { articleIds, updatedAt: now });
+      return true;
+    } catch (err) {
+      console.warn(err);
+      return false;
+    }
+  };
+
+  const addArticleToIssue = async (issueId: string, articleId: string): Promise<boolean> => {
+    if (!assertAdmin('addArticleToIssue')) return false;
+    const target = issues.find(i => i.id === issueId);
+    if (!target) return false;
+    if (target.articleIds.includes(articleId)) return true;
+
+    const updatedIds = [...target.articleIds, articleId];
+    return reorderArticlesInIssue(issueId, updatedIds);
+  };
+
+  const removeArticleFromIssue = async (issueId: string, articleId: string): Promise<boolean> => {
+    if (!assertAdmin('removeArticleFromIssue')) return false;
+    const target = issues.find(i => i.id === issueId);
+    if (!target) return false;
+
+    const updatedIds = target.articleIds.filter(id => id !== articleId);
+    return reorderArticlesInIssue(issueId, updatedIds);
+  };
+
+  const assignReviewerToArticle = (articleId: string, reviewerId: string, reviewerName: string) => {
+    if (!assertAdmin('assignReviewerToArticle')) return;
+    const today = new Date().toISOString().split('T')[0];
+    setArticles(prev =>
+      prev.map(art => {
+        if (art.id !== articleId) return art;
+        const noteAddition = `[${today}] Assigned reviewer: ${reviewerName}.`;
+        const updatedNotes = art.editorialNotes ? `${art.editorialNotes}\n${noteAddition}` : noteAddition;
+        const newStatus = art.status === 'submitted' ? 'under_review' : art.status;
+        const updated: Article = {
+          ...art,
+          assignedReviewerId: reviewerId,
+          assignedReviewerName: reviewerName,
+          status: newStatus,
+          editorialNotes: updatedNotes,
+          lastUpdatedDate: today
+        };
+        try {
+          const artRef = doc(db, 'articles', articleId);
+          updateDoc(artRef, cleanForFirestore({
+            assignedReviewerId: reviewerId,
+            assignedReviewerName: reviewerName,
+            status: newStatus,
+            editorialNotes: updatedNotes,
+            lastUpdatedDate: today
+          })).catch(e => console.warn(e));
+        } catch (e) {
+          console.warn(e);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const requestArticleRevision = (articleId: string, instructions: string) => {
+    if (!assertAdmin('requestArticleRevision')) return;
+    const today = new Date().toISOString().split('T')[0];
+    setArticles(prev =>
+      prev.map(art => {
+        if (art.id !== articleId) return art;
+        const noteAddition = `[${today}] Revisions Requested: ${instructions}`;
+        const updatedNotes = art.editorialNotes ? `${art.editorialNotes}\n${noteAddition}` : noteAddition;
+        const updated: Article = {
+          ...art,
+          status: 'revision_requested',
+          revisionInstructions: instructions,
+          editorialNotes: updatedNotes,
+          lastUpdatedDate: today
+        };
+        try {
+          const artRef = doc(db, 'articles', articleId);
+          updateDoc(artRef, cleanForFirestore({
+            status: 'revision_requested',
+            revisionInstructions: instructions,
+            editorialNotes: updatedNotes,
+            lastUpdatedDate: today
+          })).catch(e => console.warn(e));
+        } catch (e) {
+          console.warn(e);
+        }
+        return updated;
+      })
+    );
+  };
+
+  const exportSubmissionsCsv = () => {
+    const headers = [
+      'Manuscript ID',
+      'Title',
+      'Corresponding Author',
+      'Author Email',
+      'Affiliation',
+      'Track',
+      'Status',
+      'Submission Date',
+      'Assigned Reviewer',
+      'Volume',
+      'Issue',
+      'Year',
+      'DOI',
+      'Editorial Notes'
+    ];
+
+    const rows = articles.map(art => {
+      const corr = art.authors.find(a => a.isCorresponding) || art.authors[0];
+      return [
+        art.trackingId,
+        `"${(art.title || '').replace(/"/g, '""')}"`,
+        `"${(corr?.name || '').replace(/"/g, '""')}"`,
+        corr?.email || '',
+        `"${(corr?.affiliation || '').replace(/"/g, '""')}"`,
+        `"${(art.track || '').replace(/"/g, '""')}"`,
+        art.status,
+        art.submissionDate,
+        `"${(art.assignedReviewerName || 'Unassigned').replace(/"/g, '""')}"`,
+        art.volume ?? '',
+        art.issue ?? '',
+        art.year ?? '',
+        art.doi || '',
+        `"${(art.editorialNotes || '').replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `CHSSH_Submissions_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const connectDrive = async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await connectGoogleDrive();
+      setIsGoogleDriveConnected(true);
+      setGoogleDriveUser(res.user);
+      // Automatically provision standard journal folder structure
+      ensureJournalFolderStructure(new Date().getFullYear()).catch(e => console.warn('Drive folder tree init notice:', e));
+      return { success: true };
+    } catch (err: any) {
+      console.error('connectDrive error:', err);
+      return { success: false, error: err.message || 'Failed to connect Google Drive' };
+    }
+  };
+
+  const disconnectDrive = async (): Promise<void> => {
+    await disconnectGoogleDrive();
+    setIsGoogleDriveConnected(false);
+    setGoogleDriveUser(null);
+  };
+
+  const ensureDriveFolderTree = async (): Promise<boolean> => {
+    try {
+      await ensureJournalFolderStructure(new Date().getFullYear());
+      return true;
+    } catch (err) {
+      console.error('Error ensuring Drive folder tree:', err);
+      return false;
+    }
+  };
+
+  const syncManuscriptToGoogleDrive = async (articleId: string): Promise<boolean> => {
+    const targetArt = articles.find(a => a.id === articleId);
+    if (!targetArt) return false;
+
+    let fileDataUrl = targetArt.fileDataUrl;
+    if (!fileDataUrl) {
+      try {
+        fileDataUrl = (await getOriginalManuscriptFile(articleId)) || undefined;
+      } catch (err) {
+        console.warn('Error reading manuscript file from IndexedDB:', err);
+      }
+    }
+    if (!fileDataUrl) {
+      try {
+        fileDataUrl = localStorage.getItem(`chssh_orig_file_${articleId}`) || undefined;
+      } catch (e) {
+        console.warn('Error reading from localStorage:', e);
+      }
+    }
+
+    if (!fileDataUrl) {
+      console.warn(`No file content found for manuscript ${targetArt.trackingId}`);
+      const failUpdates: Partial<Article> = {
+        driveUploadStatus: 'failed',
+        driveUploadError: 'No original manuscript file found in local cache to upload.'
+      };
+      setArticles(prev => prev.map(a => a.id === articleId ? { ...a, ...failUpdates } : a));
+      return false;
+    }
+
+    const subYear = targetArt.submissionDate ? parseInt(targetArt.submissionDate.split('-')[0], 10) : new Date().getFullYear();
+
+    const res = await uploadManuscriptToGoogleDrive(
+      {
+        dataUrl: fileDataUrl,
+        originalFileName: targetArt.fileName,
+        mimeType: detectMimeType(targetArt.fileName || 'manuscript.docx')
+      },
+      {
+        trackingId: targetArt.trackingId,
+        title: targetArt.title,
+        year: isNaN(subYear) ? new Date().getFullYear() : subYear,
+        status: targetArt.status
+      }
+    );
+
+    if (res.success && res.fileId) {
+      const driveUpdates: Partial<Article> = {
+        driveFileId: res.fileId,
+        driveFolderId: res.folderId,
+        driveUploadStatus: 'uploaded',
+        driveUploadedAt: new Date().toISOString(),
+        driveUploadError: undefined
+      };
+
+      setArticles(prev => prev.map(a => a.id === articleId ? { ...a, ...driveUpdates } : a));
+
+      try {
+        const artRef = doc(db, 'articles', articleId);
+        await updateDoc(artRef, cleanForFirestore(driveUpdates));
+      } catch (e) {
+        console.warn('Error saving drive metadata to Firestore:', e);
+      }
+      return true;
+    } else {
+      const failUpdates: Partial<Article> = {
+        driveUploadStatus: 'failed',
+        driveUploadError: res.error || 'Failed to upload to Google Drive'
+      };
+      setArticles(prev => prev.map(a => a.id === articleId ? { ...a, ...failUpdates } : a));
+      try {
+        const artRef = doc(db, 'articles', articleId);
+        await updateDoc(artRef, cleanForFirestore(failUpdates));
+      } catch (e) {
+        console.warn('Error saving drive failure in Firestore:', e);
+      }
+      return false;
+    }
+  };
+
   const incrementArticleViews = (id: string) => {
     setArticles(prev =>
       prev.map(art => {
@@ -2420,6 +3100,16 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         batch.set(revRef, cleanForFirestore(rev));
       });
 
+      volumes.forEach((vol) => {
+        const volRef = doc(db, 'journal_volumes', vol.id);
+        batch.set(volRef, cleanForFirestore(vol));
+      });
+
+      issues.forEach((iss) => {
+        const issRef = doc(db, 'journal_issues', iss.id);
+        batch.set(issRef, cleanForFirestore(iss));
+      });
+
       const assetsDocRef = doc(db, 'journal_content', 'assets');
       const lightweightAssets: Record<string, JournalUploadedAsset> = {};
       Object.entries(uploadedAssets).forEach(([k, item]) => {
@@ -2453,6 +3143,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         editorialBoard,
         advisoryBoard,
         reviewers,
+        volumes,
+        issues,
         uploadedAssets,
         palette,
         exportDate: new Date().toISOString(),
@@ -2482,6 +3174,12 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       if (data.reviewers) {
         setReviewers(data.reviewers);
+      }
+      if (data.volumes) {
+        setVolumes(data.volumes);
+      }
+      if (data.issues) {
+        setIssues(data.issues);
       }
       if (data.uploadedAssets) {
         setUploadedAssets(data.uploadedAssets);
@@ -2537,6 +3235,22 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         openAuthorAuthModal,
         closeAuthorAuthModal,
         requireAuthorAuth,
+        volumes,
+        issues,
+        createVolume,
+        updateVolume,
+        deleteVolume,
+        createIssue,
+        updateIssue,
+        deleteIssue,
+        publishIssue,
+        unpublishIssue,
+        reorderArticlesInIssue,
+        addArticleToIssue,
+        removeArticleFromIssue,
+        assignReviewerToArticle,
+        requestArticleRevision,
+        exportSubmissionsCsv,
         updateContentText,
         updateEntireContent,
         resetContentToDefault,
@@ -2590,6 +3304,12 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         rejectReviewer,
         deleteReviewer,
         addReviewer,
+        isGoogleDriveConnected,
+        googleDriveUser,
+        connectDrive,
+        disconnectDrive,
+        syncManuscriptToGoogleDrive,
+        ensureDriveFolderTree,
         exportAllData,
         importAllData,
         firebaseStatus,

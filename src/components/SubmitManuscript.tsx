@@ -147,8 +147,14 @@ export const SubmitManuscript: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 50 * 1024 * 1024) {
-      setError('File exceeds maximum upload size (50MB).');
+    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    if (!['.pdf', '.doc', '.docx'].includes(ext)) {
+      setError('Invalid file format. Only PDF, DOC, and DOCX manuscript files are accepted.');
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      setError('File exceeds maximum upload size (25MB).');
       return;
     }
 
@@ -748,6 +754,9 @@ export const SubmitManuscript: React.FC = () => {
                 {copiedTrackingId ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1.5 pt-1">
+              <span>Automatic archive configured for editorial Google Drive (<span className="font-mono">chsshtmv@gmail.com</span>)</span>
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">

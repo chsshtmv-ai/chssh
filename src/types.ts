@@ -76,11 +76,51 @@ export interface Article {
   publishedStoragePath?: string;
   publishedDownloadURL?: string;
   publishedMimeType?: string;
+  // Reviewer assignment & editorial tracking
+  assignedReviewerId?: string;
+  assignedReviewerName?: string;
+  revisionInstructions?: string;
+  storageStatus?: 'stored_locally' | 'cloud_synced' | 'pending';
   // Google Drive integration fields
   driveUrl?: string;
   driveFileId?: string;
+  driveFolderId?: string;
+  driveUploadStatus?: 'pending' | 'uploaded' | 'failed';
+  driveUploadError?: string;
+  driveUploadedAt?: string;
   driveResourceType?: 'pdf' | 'document' | 'spreadsheet' | 'presentation' | 'drive_file' | string;
   coverImage?: string;
+}
+
+export interface JournalVolume {
+  id: string;
+  volumeNumber: number;
+  year: number;
+  title?: string;
+  description?: string;
+  coverImage?: string;
+  status: 'draft' | 'published' | 'archived';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface JournalIssue {
+  id: string;
+  volumeId: string;
+  volumeNumber: number;
+  issueNumber: number;
+  year: number;
+  title: string;
+  publicationDate: string;
+  coverImage?: string;
+  editorialPdfUrl?: string;
+  editorialPdfName?: string;
+  tableOfContentsSummary?: string;
+  articleIds: string[];
+  status: 'draft' | 'published' | 'archived';
+  isCurrent: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface EditorialMember {

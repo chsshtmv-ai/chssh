@@ -23,6 +23,8 @@ import {
 export const CurrentIssue: React.FC = () => {
   const {
     articles,
+    issues,
+    volumes,
     setSelectedArticleForView,
     uploadedAssets,
     content,
@@ -55,12 +57,35 @@ export const CurrentIssue: React.FC = () => {
   }, []);
 
   const publishedArticles = articles.filter((a) => a.status === 'published');
-  const activeVolume = publishedArticles[0]?.volume || 7;
-  const activeIssue = publishedArticles[0]?.issue || 1;
-  const issueArticles = publishedArticles.filter(
-    (a) => (a.volume === activeVolume && a.issue === activeIssue) || publishedArticles.length <= 8
-  );
-  const currentArticles = issueArticles.length > 0 ? issueArticles : publishedArticles;
+  
+  // Dynamically resolve Current Issue from managed issues collection
+  const currentIssueRecord =
+    issues.find((i) => i.isCurrent && i.status === 'published') ||
+    issues.find((i) => i.isCurrent) ||
+    issues.find((i) => i.status === 'published') ||
+    issues[0];
+
+  const activeVolume = currentIssueRecord ? currentIssueRecord.volumeNumber : (publishedArticles[0]?.volume || 1);
+  const activeIssue = currentIssueRecord ? currentIssueRecord.issueNumber : (publishedArticles[0]?.issue || 1);
+  const activeYear = currentIssueRecord ? currentIssueRecord.year : (publishedArticles[0]?.year || 2026);
+
+  // Articles specifically ordered for this issue if configured, else all published articles belonging to this volume/issue
+  let currentArticles: Article[] = [];
+  if (currentIssueRecord && currentIssueRecord.articleIds && currentIssueRecord.articleIds.length > 0) {
+    const ordered = currentIssueRecord.articleIds
+      .map((id) => articles.find((a) => a.id === id))
+      .filter(Boolean) as Article[];
+    if (ordered.length > 0) {
+      currentArticles = ordered;
+    }
+  }
+
+  if (currentArticles.length === 0) {
+    const matched = publishedArticles.filter(
+      (a) => a.volume === activeVolume && a.issue === activeIssue
+    );
+    currentArticles = matched.length > 0 ? matched : publishedArticles;
+  }
 
   const filteredArticles = filterQuery.trim()
     ? currentArticles.filter(
@@ -178,31 +203,39 @@ export const CurrentIssue: React.FC = () => {
         <div className="flex flex-col md:flex-row items-start justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-tight">
-              <EditableText
-                id="current_issue_title"
-                placeholder="Volume 7, Issue 1 — Epistemic Reconfigurations in Contemporary Theory"
-              />
+              {currentIssueRecord?.title ? (
+                <span>{currentIssueRecord.title}</span>
+              ) : (
+                <EditableText
+                  id="current_issue_title"
+                  placeholder={`Volume ${activeVolume}, Issue ${activeIssue} — Foundational Research`}
+                />
+              )}
             </h1>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-serif leading-relaxed">
-              <EditableText
-                id="current_issue_desc"
-                multiline
-                placeholder="A curated compendium of critical interventions examining digital sociality, algorithmic governance, environmental justice, and postcolonial humanities methodologies."
-              />
+              {currentIssueRecord?.tableOfContentsSummary ? (
+                <span>{currentIssueRecord.tableOfContentsSummary}</span>
+              ) : (
+                <EditableText
+                  id="current_issue_desc"
+                  multiline
+                  placeholder="A curated compendium of peer-reviewed critical interventions examining social sciences, humanities methodologies, and sustainable development."
+                />
+              )}
             </p>
           </div>
 
           {/* Issue Cover Artwork / Folio */}
           <div className="shrink-0 w-full md:w-56">
-            {coverAsset?.fileDataUrl?.startsWith('data:image/') ? (
+            {coverAsset?.fileDataUrl?.startsWith('data:image/') || currentIssueRecord?.coverImage ? (
               <div className="bg-[#0f1f38] dark:bg-slate-850 rounded-xl overflow-hidden border border-[#1c355e]/40 dark:border-slate-750 shadow-md group relative">
                 <img
-                  src={coverAsset.fileDataUrl}
-                  alt={coverAsset.title || 'Journal Cover Artwork'}
+                  src={currentIssueRecord?.coverImage || coverAsset?.fileDataUrl}
+                  alt={currentIssueRecord?.title || coverAsset?.title || 'Journal Cover Artwork'}
                   className="w-full h-48 object-cover object-top transition duration-300 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center p-2 text-center text-white space-y-2">
-                  <span className="text-[11px] font-bold font-serif">{coverAsset.title}</span>
+                  <span className="text-[11px] font-bold font-serif">{currentIssueRecord?.title || coverAsset?.title}</span>
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"
@@ -221,7 +254,7 @@ export const CurrentIssue: React.FC = () => {
                   </div>
                 </div>
                 <div className="p-2 text-center bg-[#0a162b]/95 border-t border-[#1c355e]/50 text-[10px] text-sky-300 font-mono">
-                  {coverAsset.volumeInfo || 'Vol. 7   No. 1'} Cover
+                  Vol. {activeVolume} • No. {activeIssue} ({activeYear})
                 </div>
               </div>
             ) : (
@@ -230,7 +263,7 @@ export const CurrentIssue: React.FC = () => {
                   <EditableText id="current_issue_folio_label" placeholder="CHSSH Issue Folio" />
                 </div>
                 <div className="text-lg font-serif font-bold text-white">
-                  <EditableText id="current_issue_folio_vol" placeholder="Vol. 7   No. 1" />
+                  Vol. {activeVolume} • No. {activeIssue} ({activeYear})
                 </div>
 
                 {coverAsset?.isUploaded && (

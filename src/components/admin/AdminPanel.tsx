@@ -33,7 +33,8 @@ import {
   X,
   Globe,
   Send,
-  FolderOpen
+  FolderOpen,
+  Layers
 } from 'lucide-react';
 import { AdminEditorialBoard } from './AdminEditorialBoard';
 import { AdminAdvisoryBoard } from './AdminAdvisoryBoard';
@@ -41,6 +42,8 @@ import { AdminReviewersPanel } from './AdminReviewersPanel';
 import { AdminManuscriptDownloads } from './AdminManuscriptDownloads';
 import { AdminPublicationSection } from './AdminPublicationSection';
 import { AdminGoogleDriveRegistrar } from './AdminGoogleDriveRegistrar';
+import { AdminVolumeIssueManagement } from './AdminVolumeIssueManagement';
+import { AdminManuscriptManagement } from './AdminManuscriptManagement';
 import { DocumentPreviewModal } from '../DocumentPreviewModal';
 import { triggerFileDownload } from '../../utils/downloadGenerators';
 import { getAssetFile } from '../../utils/fileStorage';
@@ -51,6 +54,8 @@ export const AdminPanel: React.FC = () => {
     adminActiveSubTab,
     setAdminActiveSubTab,
     setActiveTab,
+    volumes,
+    issues,
     articles,
     updateArticleStatus,
     deleteArticle,
@@ -421,6 +426,19 @@ export const AdminPanel: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => setAdminActiveSubTab('volumes')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer ${
+              adminActiveSubTab === 'volumes'
+                ? 'bg-[#102344] text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-stone-800'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5 text-amber-500" />
+            <span>Volumes &amp; Issues ({volumes.length})</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setAdminActiveSubTab('publication')}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer ${
               adminActiveSubTab === 'publication'
@@ -538,204 +556,11 @@ export const AdminPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* SUBTAB: Submissions Management */}
-      {adminActiveSubTab === 'submissions' && (
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-4 sm:p-6 shadow-2xs space-y-4">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <div className="relative flex-1">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Filter manuscripts by title, tracking ID, or author..."
-                  className="w-full pl-10 pr-4 py-2 text-xs rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Filter className="w-3.5 h-3.5 text-slate-400" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-800 dark:text-slate-200"
-                >
-                  <option value="all">All Statuses ({articles.length})</option>
-                  <option value="submitted">Submitted</option>
-                  <option value="under_review">Under Review</option>
-                  <option value="revision_requested">Revision Requested</option>
-                  <option value="accepted">Accepted</option>
-                  <option value="published">Published</option>
-                  <option value="rejected">Declined</option>
-                </select>
-              </div>
-            </div>
+      {/* SUBTAB: Manuscript Management (Module 2) */}
+      {adminActiveSubTab === 'submissions' && <AdminManuscriptManagement />}
 
-            <div className="divide-y divide-slate-100 dark:divide-stone-800 text-xs">
-              {filteredSubmissions.map((art) => (
-                <div
-                  key={art.id}
-                  className="py-4 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-stone-800/20 p-2 rounded-lg"
-                >
-                  <div className="space-y-1 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono font-bold text-[#102344] dark:text-sky-300">
-                        {art.trackingId}
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-stone-800 text-slate-700 dark:text-slate-300 uppercase">
-                        {art.status.replace('_', ' ')}
-                      </span>
-                      <span className="text-slate-400 text-[11px]">{art.submissionDate}</span>
-                    </div>
-                    <h3 className="font-serif font-semibold text-slate-900 dark:text-slate-100 text-sm">
-                      {art.title}
-                    </h3>
-                    <p className="text-slate-500 text-[11px]">
-                      Authors: {art.authors.map((a) => a.name).join(', ')} • Track: {art.track}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedSubmission(art);
-                        setNewStatusInput(art.status);
-                        setEditorialNoteInput(art.editorialNotes || '');
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-[#102344] text-white text-xs font-medium hover:bg-[#1a386c] cursor-pointer"
-                    >
-                      Evaluate &amp; Status
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => downloadOriginalManuscript(art)}
-                      className="p-1.5 rounded-lg border border-slate-200 dark:border-stone-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 cursor-pointer"
-                      title="Download Author Manuscript"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm(`Delete submission "${art.title}"?`)) {
-                          deleteArticle(art.id);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 cursor-pointer"
-                      title="Delete Submission"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {filteredSubmissions.length === 0 && (
-                <div className="text-center py-8 text-slate-400">
-                  No manuscripts found matching current filter.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Submission Evaluation Modal */}
-          {selectedSubmission && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-              <div className="bg-white dark:bg-stone-900 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-stone-200 dark:border-stone-800 p-6 space-y-4 shadow-2xl">
-                <div className="flex items-center justify-between border-b border-slate-100 dark:border-stone-800 pb-3">
-                  <div>
-                    <span className="text-[11px] font-mono text-slate-500">
-                      Tracking ID: {selectedSubmission.trackingId}
-                    </span>
-                    <h2 className="text-base font-serif font-bold text-slate-900 dark:text-slate-100">
-                      Manuscript Peer Review &amp; Status Decision
-                    </h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSubmission(null)}
-                    className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 cursor-pointer"
-                  >
-                    &times;
-                  </button>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <h3 className="font-semibold text-slate-800 dark:text-slate-200">
-                      {selectedSubmission.title}
-                    </h3>
-                    <p className="text-slate-500 mt-1 line-clamp-3">{selectedSubmission.abstract}</p>
-                  </div>
-
-                  <form onSubmit={handleUpdateSubmissionStatus} className="space-y-4 pt-2">
-                    <div>
-                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        Update Manuscript Status
-                      </label>
-                      <select
-                        value={newStatusInput}
-                        onChange={(e) => setNewStatusInput(e.target.value as ArticleStatus)}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100 font-medium"
-                      >
-                        <option value="submitted">Submitted (Desk Screening)</option>
-                        <option value="under_review">Under Double-Blind Peer Review</option>
-                        <option value="revision_requested">Revision Requested</option>
-                        <option value="accepted">Accepted for Publication</option>
-                        <option value="published">Published</option>
-                        <option value="rejected">Declined</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        Official Editorial Note (Visible to Authors)
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={editorialNoteInput}
-                        onChange={(e) => setEditorialNoteInput(e.target.value)}
-                        placeholder="Add decision remarks, guidance for revisions, or review timeline..."
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        Add Evaluator / Peer Reviewer Report Comment
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={reviewerCommentInput}
-                        onChange={(e) => setReviewerCommentInput(e.target.value)}
-                        placeholder="Summary of external peer review findings..."
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-stone-800">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedSubmission(null)}
-                        className="px-4 py-2 rounded-lg border border-slate-200 dark:border-stone-700 text-slate-600 dark:text-slate-300 cursor-pointer"
-                      >
-                        Close
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-5 py-2 rounded-lg bg-[#102344] text-white font-medium hover:bg-[#1a386c] cursor-pointer"
-                      >
-                        Save Status &amp; Notes
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* SUBTAB: Volume and Issue Management (Module 3 & 4) */}
+      {adminActiveSubTab === 'volumes' && <AdminVolumeIssueManagement />}
 
       {/* SUBTAB: Typesetting & DOIs */}
       {adminActiveSubTab === 'publication' && <AdminPublicationSection />}

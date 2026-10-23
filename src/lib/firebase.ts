@@ -9,7 +9,7 @@ export const firebaseConfig = {
   appId: firebaseConfigData.appId,
   apiKey: firebaseConfigData.apiKey,
   authDomain: firebaseConfigData.authDomain,
-  firestoreDatabaseId: firebaseConfigData.firestoreDatabaseId,
+  firestoreDatabaseId: (firebaseConfigData as any).firestoreDatabaseId || '(default)',
   storageBucket: firebaseConfigData.storageBucket,
   messagingSenderId: firebaseConfigData.messagingSenderId,
   oAuthClientId: firebaseConfigData.oAuthClientId,
@@ -25,8 +25,11 @@ const app = getApps().length > 0 ? getApp() : initializeApp({
   appId: firebaseConfig.appId,
 });
 
-// Initialize Firestore with specific databaseId
-export const db: Firestore = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore with specific databaseId if defined
+export const db: Firestore =
+  firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+    ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+    : getFirestore(app);
 
 // Initialize Firebase Auth
 export const auth: Auth = getAuth(app);
