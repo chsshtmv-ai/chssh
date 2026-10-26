@@ -100,8 +100,8 @@ export function parseGoogleDriveUrl(inputUrl: string): ParsedGoogleDriveResource
   }
 
   let previewUrl = `https://drive.google.com/file/d/${fileId}/preview`;
-  let downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-  let directViewUrl = `https://drive.google.com/file/d/${fileId}/view`;
+  let downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}&confirm=t`;
+  let directViewUrl = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
   const canonicalShareUrl = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
 
   if (resourceType === 'document') {

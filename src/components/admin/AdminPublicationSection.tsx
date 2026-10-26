@@ -46,6 +46,7 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
   initialSelectedArticleId
 }) => {
   const {
+    isAdmin,
     content,
     articles,
     updateArticle,
@@ -92,6 +93,8 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
 
   const isCreatingNew = selectedArticleId === 'new';
   const targetArticle = isCreatingNew ? null : articles.find(a => a.id === selectedArticleId);
+
+  if (!isAdmin) return null;
 
   // Tracks list
   const tracks = [

@@ -34,6 +34,7 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
   initialSelectedArticleId
 }) => {
   const {
+    isAdmin,
     articles,
     attachGoogleDrivePaper,
     updateArticle,
@@ -71,6 +72,8 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
 
   const isCreatingNew = selectedArticleId === 'new';
   const targetArticle = isCreatingNew ? null : articles.find(a => a.id === selectedArticleId);
+
+  if (!isAdmin) return null;
 
   // Parse Drive URL in real-time
   const parsedDrive = parseGoogleDriveUrl(driveUrl);

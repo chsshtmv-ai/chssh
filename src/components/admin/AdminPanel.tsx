@@ -52,6 +52,7 @@ import { validatePdfFile, getFreshPdfUrl } from '../../services/pdfStorageServic
 
 export const AdminPanel: React.FC = () => {
   const {
+    isAdmin,
     adminActiveSubTab,
     setAdminActiveSubTab,
     setActiveTab,
@@ -125,6 +126,35 @@ export const AdminPanel: React.FC = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [docSlotTabs, setDocSlotTabs] = useState<Record<string, 'manage' | 'publish'>>({});
+
+  if (!isAdmin) {
+    return (
+      <div className="max-w-xl mx-auto py-12 px-4 sm:px-6">
+        <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/90 dark:border-stone-800 p-8 sm:p-10 text-center space-y-6 shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-400 flex items-center justify-center mx-auto border border-red-200 dark:border-red-800">
+            <Lock className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="font-serif text-2xl font-bold text-slate-900 dark:text-slate-100">
+              Admin Authentication Required
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-serif leading-relaxed">
+              Administrative management of published papers, manuscripts, and journal settings is restricted exclusively to authenticated editorial staff.
+            </p>
+          </div>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('home')}
+              className="px-6 py-2.5 bg-[#102344] hover:bg-[#1a386c] text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs transition"
+            >
+              Return to Homepage
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const filteredSubmissions = articles.filter((art) => {
     const matchesFilter = statusFilter === 'all' || art.status === statusFilter;

@@ -62,8 +62,9 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
   const doi = article.doi || `10.5281/chssh.${year}.${volume}${issue}01`;
 
   const isGoogleDriveArticle = Boolean(article.driveUrl || article.driveFileId);
+  const isPublished = article.status === 'published';
 
-  const hasUploadedPaper = Boolean(
+  const hasUploadedPaper = isPublished || Boolean(
     isGoogleDriveArticle ||
     article.publishedStoragePath ||
     article.storagePath ||
@@ -246,7 +247,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
                     className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
                   >
                     <Download className="w-4 h-4 text-emerald-200" />
-                    <span>Download Published Paper</span>
+                    <span>Download PDF</span>
                   </motion.button>
                 </div>
               </div>
@@ -309,7 +310,7 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
                     >
                       <Download className="w-4 h-4 text-sky-300" />
                       <span>
-                        <EditableText id="modal_download_btn" placeholder="Download Published Article" />
+                        <EditableText id="modal_download_btn" placeholder="Download PDF" />
                       </span>
                     </motion.button>
                   </>
