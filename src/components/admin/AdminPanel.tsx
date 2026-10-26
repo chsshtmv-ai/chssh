@@ -53,6 +53,11 @@ import { validatePdfFile, getFreshPdfUrl } from '../../services/pdfStorageServic
 export const AdminPanel: React.FC = () => {
   const {
     isAdmin,
+    adminUser,
+    adminAuthLoading,
+    adminAuthError,
+    loginAdminWithGoogle,
+    logoutAdmin,
     adminActiveSubTab,
     setAdminActiveSubTab,
     setActiveTab,
@@ -128,6 +133,12 @@ export const AdminPanel: React.FC = () => {
   const [docSlotTabs, setDocSlotTabs] = useState<Record<string, 'manage' | 'publish'>>({});
 
   if (!isAdmin) {
+    const isUnauthorizedGoogleAccount = Boolean(
+      adminUser &&
+      adminUser.email &&
+      adminUser.email.toLowerCase().trim() !== 'chsshtmv@gmail.com'
+    );
+
     return (
       <div className="max-w-xl mx-auto py-12 px-4 sm:px-6">
         <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/90 dark:border-stone-800 p-8 sm:p-10 text-center space-y-6 shadow-sm">
@@ -139,14 +150,63 @@ export const AdminPanel: React.FC = () => {
               Admin Authentication Required
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-serif leading-relaxed">
-              Administrative management of published papers, manuscripts, and journal settings is restricted exclusively to authenticated editorial staff.
+              Administrative management of published papers, manuscripts, and journal settings is restricted exclusively to the verified administrator Google account: <strong className="font-mono text-slate-800 dark:text-slate-200">chsshtmv@gmail.com</strong>.
             </p>
           </div>
-          <div className="pt-2">
+
+          {isUnauthorizedGoogleAccount && (
+            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-900 dark:text-red-200 text-left space-y-2 text-xs">
+              <div className="flex items-center gap-2 font-bold">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0" />
+                <span>Unauthorized Google Account Detected</span>
+              </div>
+              <p className="leading-relaxed">
+                You are currently signed in as <span className="font-mono font-bold">{adminUser?.email}</span>. This account has been denied access to all administrative functions.
+              </p>
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={logoutAdmin}
+                  className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Sign Out of {adminUser?.email}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {adminAuthError && !isUnauthorizedGoogleAccount && (
+            <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 text-red-800 dark:text-red-200 text-xs text-left flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <span>{adminAuthError}</span>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={loginAdminWithGoogle}
+              disabled={adminAuthLoading}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-6 py-2.5 bg-[#102344] hover:bg-[#1a386c] text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs transition disabled:opacity-50"
+            >
+              {adminAuthLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-sky-300" />
+                  <span>Authenticating with Google...</span>
+                </>
+              ) : (
+                <>
+                  <Shield className="w-4 h-4 text-amber-400" />
+                  <span>Sign In with Google (chsshtmv@gmail.com)</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => setActiveTab('home')}
-              className="px-6 py-2.5 bg-[#102344] hover:bg-[#1a386c] text-white rounded-xl text-xs font-semibold cursor-pointer shadow-xs transition"
+              className="w-full sm:w-auto px-5 py-2.5 bg-stone-100 dark:bg-stone-800 hover:bg-stone-200 dark:hover:bg-stone-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-medium cursor-pointer transition"
             >
               Return to Homepage
             </button>

@@ -6,64 +6,90 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // STRICT SERVER-SIDE ADMIN AUTHORIZATION:
+    // Only the verified official CHSSH administrator Google account (chsshtmv@gmail.com)
+    // is granted administrative privileges.
+    function isChsshAdmin() {
+      return isSignedIn()
+        && request.auth.token.email.lower() == 'chsshtmv@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
     // Default deny for unmapped paths
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Journal content document: public read, write restricted
+    // Journal content document: public read, write restricted to chsshtmv@gmail.com
     match /journal_content/{contentId} {
       allow read: if true;
-      allow write: if isSignedIn() || request.resource.data != null;
+      allow write: if isChsshAdmin();
     }
 
-    // Official uploaded assets / downloads: public read for active/uploaded files
+    // Official uploaded assets / downloads (covers, templates, etc.): public read, write restricted to chsshtmv@gmail.com
     match /journal_assets/{assetId} {
       allow read: if true;
-      allow write: if isSignedIn() || request.resource.data != null;
+      allow write: if isChsshAdmin();
     }
 
     // Articles / Manuscripts:
-    // - Public read for published articles
-    // - Authors can create new submissions
-    // - Admin can publish, update status, and manage records
+    // - Public read for published articles & metadata lookup
+    // - Public create for new manuscript submissions (must include title & trackingId)
+    // - Updates & Deletions strictly restricted to chsshtmv@gmail.com
+    //   (or author updating only non-administrative fields like linking authorUserId)
     match /articles/{articleId} {
-      allow read: if resource.data.status == 'published' || isSignedIn() || true;
+      allow read: if true;
       allow create: if request.resource.data.title is string
                     && request.resource.data.trackingId is string;
-      allow update, delete: if isSignedIn() || true;
+      allow update: if isChsshAdmin()
+                    || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authorUserId']));
+      allow delete: if isChsshAdmin();
     }
 
-    // Editorial Board: public read
+    // Editorial Board: public read, write strictly restricted to chsshtmv@gmail.com
     match /editorial_board/{memberId} {
       allow read: if true;
-      allow write: if isSignedIn() || request.resource.data.name is string;
+      allow write: if isChsshAdmin();
     }
 
-    // Advisory Board: public read
+    // Advisory Board: public read, write strictly restricted to chsshtmv@gmail.com
     match /advisory_board/{memberId} {
       allow read: if true;
-      allow write: if isSignedIn() || request.resource.data.name is string;
+      allow write: if isChsshAdmin();
     }
 
-    // Peer Reviewers: public read for accepted reviewers, public create for new applicants
+    // Journal Volumes & Archives: public read, write strictly restricted to chsshtmv@gmail.com
+    match /journal_volumes/{volumeId} {
+      allow read: if true;
+      allow write: if isChsshAdmin();
+    }
+
+    // Journal Issues & Archives: public read, write strictly restricted to chsshtmv@gmail.com
+    match /journal_issues/{issueId} {
+      allow read: if true;
+      allow write: if isChsshAdmin();
+    }
+
+    // Peer Reviewers: public read for reviewer directory, public create for new applicants,
+    // approve/reject/delete/update strictly restricted to chsshtmv@gmail.com
     match /reviewers/{reviewerId} {
-      allow read: if resource.data.status == 'accepted' || isSignedIn() || true;
+      allow read: if true;
       allow create: if request.resource.data.name is string && request.resource.data.email is string;
-      allow update, delete: if isSignedIn() || true;
+      allow update, delete: if isChsshAdmin();
     }
 
-    // Author Accounts: register & authentication lookup
+    // Author Accounts: register & authentication lookup for author dashboard
     match /author_accounts/{authorId} {
       allow read: if true;
       allow create: if request.resource.data.userId is string && request.resource.data.phone is string;
-      allow update, delete: if isSignedIn() || true;
+      allow update: if request.resource.data.userId is string || isChsshAdmin();
+      allow delete: if isChsshAdmin();
     }
 
-    // App settings: security, SMS gateway, theme
+    // App settings: security, SMS gateway, theme (write strictly restricted to chsshtmv@gmail.com)
     match /app_settings/{settingId} {
-      allow read: if settingId == 'theme' || true;
-      allow write: if isSignedIn() || true;
+      allow read: if true;
+      allow write: if isChsshAdmin();
     }
   }
 }

@@ -6,6 +6,7 @@ import { ThemeToggle } from './ThemeToggle';
 export const AdminBar: React.FC = () => {
   const {
     isAdmin,
+    adminUser,
     logoutAdmin,
     resetContentToDefault,
     setActiveTab,
@@ -38,9 +39,9 @@ export const AdminBar: React.FC = () => {
       className="bg-stone-900 text-stone-100 border-b border-stone-800 px-4 py-2 text-xs relative z-50 shadow-md flex flex-wrap items-center justify-between gap-3"
     >
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/80 font-medium">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          <span>Admin Authenticated</span>
+        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/80 font-medium font-mono text-[11px]">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+          <span>{adminUser?.email || 'chsshtmv@gmail.com'} (Verified Admin)</span>
         </div>
 
         {/* Firebase Cloud Connection Status */}

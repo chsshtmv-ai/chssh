@@ -68,7 +68,16 @@ import {
   moveManuscriptInGoogleDrive,
   ensureJournalFolderStructure
 } from '../services/googleDriveService';
-import { signInAnonymously, type User as FirebaseUser } from 'firebase/auth';
+import {
+  signInAnonymously,
+  signInWithPopup,
+  signOut,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  type User as FirebaseUser
+} from 'firebase/auth';
+
+export const CHSSH_ADMIN_EMAIL = 'chsshtmv@gmail.com';
 
 export type FirebaseConnectionStatus = 'connected' | 'connecting' | 'error' | 'syncing';
 
@@ -114,6 +123,10 @@ interface JournalContextType {
   fetchActivePdf: (slotId?: string) => Promise<JournalUploadedAsset | null>;
   activePdf: JournalUploadedAsset | null;
   // Admin Authentication & Modes
+  adminUser: FirebaseUser | null;
+  adminAuthLoading: boolean;
+  adminAuthError: string | null;
+  loginAdminWithGoogle: () => Promise<{ success: boolean; error?: string; user?: FirebaseUser }>;
   loginAdmin: (password: string) => boolean;
   logoutAdmin: () => void;
   changeAdminPassword: (newPass: string) => boolean;
@@ -434,9 +447,51 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSmsLogs(getSmsLogs());
   };
 
+  const [adminUser, setAdminUser] = useState<FirebaseUser | null>(() => auth.currentUser);
+  const [adminAuthLoading, setAdminAuthLoading] = useState<boolean>(true);
+  const [adminAuthError, setAdminAuthError] = useState<string | null>(null);
+
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    return sessionStorage.getItem('chssh_is_admin') === 'true';
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      return (
+        (currentUser.email || '').toLowerCase().trim() === CHSSH_ADMIN_EMAIL.toLowerCase() &&
+        currentUser.emailVerified === true
+      );
+    }
+    return false;
   });
+
+  // Continuously synchronize admin authentication with Firebase Auth
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAdminAuthLoading(false);
+      if (user) {
+        const email = (user.email || '').toLowerCase().trim();
+        const isVerified = user.emailVerified === true;
+        if (email === CHSSH_ADMIN_EMAIL.toLowerCase() && isVerified) {
+          setIsAdmin(true);
+          setAdminUser(user);
+          setAdminAuthError(null);
+          sessionStorage.setItem('chssh_is_admin', 'true');
+        } else {
+          setIsAdmin(false);
+          setAdminUser(user);
+          sessionStorage.removeItem('chssh_is_admin');
+          if (email !== CHSSH_ADMIN_EMAIL.toLowerCase()) {
+            setAdminAuthError(`Access Denied: The account "${user.email || 'Unknown'}" is not authorized. Only the official CHSSH administrator account (${CHSSH_ADMIN_EMAIL}) is permitted access.`);
+          } else if (!isVerified) {
+            setAdminAuthError(`Access Denied: The account "${user.email}" is unverified. Please verify your Gmail account to access administrator functions.`);
+          }
+        }
+      } else {
+        setIsAdmin(false);
+        setAdminUser(null);
+        sessionStorage.removeItem('chssh_is_admin');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const [isLiveEditMode, setIsLiveEditMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('home');
@@ -1292,6 +1347,60 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const loginAdminWithGoogle = async (): Promise<{ success: boolean; error?: string; user?: FirebaseUser }> => {
+    try {
+      setAdminAuthLoading(true);
+      setAdminAuthError(null);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        login_hint: CHSSH_ADMIN_EMAIL,
+        prompt: 'select_account'
+      });
+      const cred = await signInWithPopup(auth, provider);
+      const user = cred.user;
+      const email = (user.email || '').toLowerCase().trim();
+      const isVerified = user.emailVerified === true;
+
+      if (email !== CHSSH_ADMIN_EMAIL.toLowerCase()) {
+        const errorMsg = `Access Denied: The account "${user.email}" is not authorized. Only the official CHSSH administrator account (${CHSSH_ADMIN_EMAIL}) is permitted access.`;
+        setIsAdmin(false);
+        setAdminUser(user);
+        setAdminAuthError(errorMsg);
+        sessionStorage.removeItem('chssh_is_admin');
+        await signOut(auth).catch(() => {});
+        return { success: false, error: errorMsg };
+      }
+
+      if (!isVerified) {
+        const errorMsg = `Access Denied: The account "${user.email}" has not verified their email address with Google. Verification is strictly required.`;
+        setIsAdmin(false);
+        setAdminUser(user);
+        setAdminAuthError(errorMsg);
+        sessionStorage.removeItem('chssh_is_admin');
+        await signOut(auth).catch(() => {});
+        return { success: false, error: errorMsg };
+      }
+
+      setIsAdmin(true);
+      setAdminUser(user);
+      setAdminAuthError(null);
+      sessionStorage.setItem('chssh_is_admin', 'true');
+      return { success: true, user };
+    } catch (err: any) {
+      console.error('Google Admin Sign-In error:', err);
+      let errorMsg = err.message || 'Google Sign-In failed.';
+      if (err.code === 'auth/popup-closed-by-user') {
+        errorMsg = 'Sign-in cancelled: The Google authentication window was closed before completion.';
+      } else if (err.code === 'auth/popup-blocked') {
+        errorMsg = 'Popup blocked by browser. Please allow popups for this site and try again.';
+      }
+      setAdminAuthError(errorMsg);
+      return { success: false, error: errorMsg };
+    } finally {
+      setAdminAuthLoading(false);
+    }
+  };
+
   const loginAdmin = (password: string): boolean => {
     const trimmed = (password || '').trim();
     if (trimmed === adminPassword || trimmed === '323741') {
@@ -1302,9 +1411,6 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         localStorage.removeItem('chssh_admin_failed_attempts');
         localStorage.removeItem('chssh_admin_lockout_until');
       } catch {}
-      if (auth && !auth.currentUser) {
-        signInAnonymously(auth).catch(e => console.warn('Anonymous auth on admin login note:', e));
-      }
       return true;
     }
     return false;
@@ -1330,13 +1436,29 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return true;
   };
 
-  const logoutAdmin = () => {
+  const logoutAdmin = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.warn('Firebase sign-out note:', err);
+    }
     setIsAdmin(false);
+    setAdminUser(null);
+    setAdminAuthError(null);
     setIsLiveEditMode(false);
     sessionStorage.removeItem('chssh_is_admin');
   };
 
   const assertAdmin = (actionName: string): boolean => {
+    const currentUser = auth.currentUser;
+    const email = (currentUser?.email || '').toLowerCase().trim();
+    const isVerified = currentUser?.emailVerified === true;
+    if (currentUser) {
+      if (email !== CHSSH_ADMIN_EMAIL.toLowerCase() || !isVerified) {
+        console.warn(`[Security Alert] Unauthorized attempt to perform "${actionName}". Account ${currentUser.email} is not authorized for CHSSH administration.`);
+        return false;
+      }
+    }
     if (!isAdmin) {
       console.warn(`[Security Alert] Unauthorized attempt to perform "${actionName}". Content modifications are restricted exclusively to authenticated administrators within the Admin Panel.`);
       return false;
@@ -3634,6 +3756,10 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         uploadPdfAsset,
         fetchActivePdf,
         activePdf,
+        adminUser,
+        adminAuthLoading,
+        adminAuthError,
+        loginAdminWithGoogle,
         loginAdmin,
         logoutAdmin,
         changeAdminPassword,

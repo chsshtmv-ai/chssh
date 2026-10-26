@@ -311,74 +311,53 @@ export function generateTableOfContentsPdf(content: JournalContent, articles: Ar
   // Articles Table
   let y = 52;
   const published = articles.filter(a => a.status === 'published');
-  const items = published.length > 0 ? published : [
-    {
-      title: 'Algorithmic Governance and Epistemic Justice in Global Public Institutions',
-      authors: [{ name: 'Dr. Elena Rostova', affiliation: 'Oxford Institute' }],
-      pages: '1 24',
-      doi: '10.5281/chssh.2026.1042',
-      track: 'Sociology & Social Dynamics'
-    },
-    {
-      title: 'De-centering Metronormativity: Queer Rurality in Post-Industrial Communities',
-      authors: [{ name: 'Marcus Vance', affiliation: 'University of Michigan' }],
-      pages: '25 46',
-      doi: '10.5281/chssh.2026.1043',
-      track: 'Cultural & Humanities Studies'
-    },
-    {
-      title: 'Indigenous Data Sovereignty and the Ethics of Genomic Extraction',
-      authors: [{ name: 'Aroha Tanaka', affiliation: 'Auckland University' }],
-      pages: '47 71',
-      doi: '10.5281/chssh.2026.1044',
-      track: 'Anthropology & Social Inquiry'
-    },
-    {
-      title: 'Monetary Sovereignty in the Age of Central Bank Digital Currencies',
-      authors: [{ name: 'Dr. Kwame Mensah', affiliation: 'University of Ghana' }],
-      pages: '72 98',
-      doi: '10.5281/chssh.2026.1045',
-      track: 'Public Policy & Governance'
-    }
-  ];
-
-  items.forEach((item: any, idx) => {
-    if (y > pageHeight - 35) {
-      doc.addPage();
-      y = 25;
-    }
-
-    doc.setFillColor(248, 250, 252);
-    doc.rect(margin, y, contentWidth, 20, 'F');
-    doc.setDrawColor(226, 232, 240);
-    doc.rect(margin, y, contentWidth, 20, 'S');
-
-    doc.setFont('times', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(15, 31, 56);
-    const itemTitle = `${idx + 1}. ${item.title}`;
-    const titleLines = doc.splitTextToSize(itemTitle, contentWidth - 30);
-    doc.text(titleLines[0], margin + 4, y + 6);
-
-    doc.setFont('times', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(71, 85, 105);
-    const authorStr = item.authors ? item.authors.map((a: any) => a.name).join(', ') : 'Scholarly Author';
-    doc.text(authorStr, margin + 4, y + 12);
-
+  if (published.length === 0) {
     doc.setFont('times', 'italic');
-    doc.setFontSize(7.5);
+    doc.setFontSize(10);
     doc.setTextColor(100, 116, 139);
-    doc.text(`DOI: https://doi.org/${item.doi || '10.5281/chssh.2026'}  |  Track: ${item.track || 'General'}`, margin + 4, y + 17);
+    doc.text('No research papers currently published in this issue table of contents.', margin, y + 10);
+  } else {
+    published.forEach((item: any, idx) => {
+      if (y > pageHeight - 35) {
+        doc.addPage();
+        y = 25;
+      }
 
-    // Page Number Box
-    doc.setFont('times', 'bold');
-    doc.setFontSize(9.5);
-    doc.setTextColor(180, 83, 9);
-    doc.text(item.pages || 'pp. 1-20', pageWidth - margin - 4, y + 11, { align: 'right' });
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin, y, contentWidth, 20, 'F');
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(margin, y, contentWidth, 20, 'S');
 
-    y += 24;
-  });
+      doc.setFont('times', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 31, 56);
+      const itemTitle = `${idx + 1}. ${item.title}`;
+      const titleLines = doc.splitTextToSize(itemTitle, contentWidth - 30);
+      doc.text(titleLines[0], margin + 4, y + 6);
+
+      doc.setFont('times', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      const authorStr = item.authors ? item.authors.map((a: any) => a.name).join(', ') : 'Author';
+      doc.text(authorStr, margin + 4, y + 12);
+
+      doc.setFont('times', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      const metaParts: string[] = [];
+      if (item.doi) metaParts.push(`DOI: https://doi.org/${item.doi}`);
+      if (item.track) metaParts.push(`Track: ${item.track}`);
+      doc.text(metaParts.join('  |  '), margin + 4, y + 17);
+
+      // Page Number Box
+      doc.setFont('times', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(180, 83, 9);
+      doc.text(item.pages ? `pp. ${item.pages}` : '—', pageWidth - margin - 4, y + 11, { align: 'right' });
+
+      y += 24;
+    });
+  }
 
   // Footer
   doc.setDrawColor(203, 213, 225);
@@ -403,6 +382,7 @@ export function generatePublicationCertificatePdf(
     trackingId?: string;
     volume?: string;
     issue?: string;
+    year?: string | number;
     pages?: string;
     doi?: string;
   },
@@ -456,7 +436,7 @@ export function generatePublicationCertificatePdf(
   doc.setFont('times', 'bold');
   doc.setFontSize(13);
   doc.setTextColor(15, 31, 56);
-  const articleTitle = certData.paperTitle || 'Algorithmic Governance and Epistemic Justice in Global Public Institutions';
+  const articleTitle = certData.paperTitle || 'Research Article';
   const titleLines = doc.splitTextToSize(` "${articleTitle}" `, pageWidth - 60);
   doc.text(titleLines, pageWidth / 2, 68, { align: 'center' });
 
@@ -469,7 +449,7 @@ export function generatePublicationCertificatePdf(
   doc.setFont('times', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(15, 31, 56);
-  doc.text(certData.authorName || 'Dr. Elena Rostova, Ph.D.', pageWidth / 2, 94, { align: 'center' });
+  doc.text(certData.authorName || 'Contributing Scholar', pageWidth / 2, 94, { align: 'center' });
 
   // Publication Citation Block
   doc.setFillColor(248, 250, 252);
@@ -480,10 +460,17 @@ export function generatePublicationCertificatePdf(
   doc.setFont('times', 'normal');
   doc.setFontSize(9);
   doc.setTextColor(30, 41, 59);
-  const citationLine1 = `Published in ${content.journal_short_name}, ${certData.volume || 'Volume 7'}, ${certData.issue || 'Issue 1'} (2026), Pages: ${certData.pages || '14 38'}`;
-  const citationLine2 = `Manuscript Tracking ID: ${certData.trackingId || 'CHSSH-2026-1042'}  |  DOI: https://doi.org/${certData.doi || '10.5281/chssh.2026.1042'}`;
+  const citationLine1 = certData.volume && certData.issue
+    ? `Published in ${content.journal_short_name || 'CHSSH'}, Volume ${certData.volume}, Issue ${certData.issue} (${certData.year || 2026})${certData.pages ? `, Pages: ${certData.pages}` : ''}`
+    : `Published in ${content.journal_short_name || 'CHSSH'}`;
+  const citationMetaParts: string[] = [];
+  if (certData.trackingId) citationMetaParts.push(`Manuscript Tracking ID: ${certData.trackingId}`);
+  if (certData.doi) citationMetaParts.push(`DOI: https://doi.org/${certData.doi}`);
+  const citationLine2 = citationMetaParts.join('  |  ');
   doc.text(citationLine1, pageWidth / 2, 113, { align: 'center' });
-  doc.text(citationLine2, pageWidth / 2, 120, { align: 'center' });
+  if (citationLine2) {
+    doc.text(citationLine2, pageWidth / 2, 120, { align: 'center' });
+  }
 
   // Seal in center-bottom
   doc.setDrawColor(180, 83, 9);
@@ -503,7 +490,7 @@ export function generatePublicationCertificatePdf(
   doc.setFont('times', 'bold');
   doc.setFontSize(9.5);
   doc.setTextColor(15, 31, 56);
-  doc.text(content.editor_in_chief_name || 'Prof. (Dr.) Alistair Vance, D.Phil.', 67.5, 171, { align: 'center' });
+  doc.text(content.editor_in_chief_name || 'Dr. Ajay Babu', 67.5, 171, { align: 'center' });
   doc.setFont('times', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);

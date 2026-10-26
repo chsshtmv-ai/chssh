@@ -55,11 +55,11 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
   if (!article) return null;
 
   const authorsString = article.authors.map(a => a.name).join(', ');
-  const year = article.year || new Date().getFullYear();
-  const volume = article.volume || 7;
+  const year = article.year || (article.publishedDate ? new Date(article.publishedDate).getFullYear() : new Date().getFullYear());
+  const volume = article.volume || 1;
   const issue = article.issue || 1;
-  const pages = article.pages || '1 20';
-  const doi = article.doi || `10.5281/chssh.${year}.${volume}${issue}01`;
+  const pages = article.pages || '';
+  const doi = article.doi || '';
 
   const isGoogleDriveArticle = Boolean(article.driveUrl || article.driveFileId);
   const isPublished = article.status === 'published';
@@ -76,11 +76,16 @@ export const ArticleModal: React.FC<ArticleModalProps> = ({ article, onClose }) 
     (typeof window !== 'undefined' && localStorage.getItem(`chssh_pub_file_${article.id}`))
   );
 
+  const doiSuffix = doi ? ` https://doi.org/${doi}` : '';
+  const pagesStr = pages ? `, ${pages}` : '';
+  const mlaPagesStr = pages ? `, pp. ${pages}` : '';
+  const chicagoPagesStr = pages ? `: ${pages}` : '';
+
   const citations = {
-    apa: `${authorsString} (${year}). ${article.title}. Contemporary Horizons in Social Sciences and Humanities, ${volume}(${issue}), ${pages}. https://doi.org/${doi}`,
-    mla: `${authorsString}. "${article.title}." Contemporary Horizons in Social Sciences and Humanities, vol. ${volume}, no. ${issue}, ${year}, pp. ${pages}. https://doi.org/${doi}.`,
-    chicago: `${authorsString}. "${article.title}." Contemporary Horizons in Social Sciences and Humanities ${volume}, no. ${issue} (${year}): ${pages}. https://doi.org/${doi}.`,
-    bibtex: `@article{chssh_${article.trackingId.replace(/-/g, '_')},\n  title={${article.title}},\n  author={${authorsString}},\n  journal={Contemporary Horizons in Social Sciences and Humanities},\n  volume={${volume}},\n  number={${issue}},\n  pages={${pages}},\n  year={${year}},\n  doi={${doi}}\n}`
+    apa: `${authorsString} (${year}). ${article.title}. Contemporary Horizons in Social Sciences and Humanities, ${volume}(${issue})${pagesStr}.${doiSuffix}`,
+    mla: `${authorsString}. "${article.title}." Contemporary Horizons in Social Sciences and Humanities, vol. ${volume}, no. ${issue}, ${year}${mlaPagesStr}.${doiSuffix}`,
+    chicago: `${authorsString}. "${article.title}." Contemporary Horizons in Social Sciences and Humanities ${volume}, no. ${issue} (${year})${chicagoPagesStr}.${doiSuffix}`,
+    bibtex: `@article{chssh_${article.trackingId.replace(/-/g, '_')},\n  title={${article.title}},\n  author={${authorsString}},\n  journal={Contemporary Horizons in Social Sciences and Humanities},\n  volume={${volume}},\n  number={${issue}},\n  pages={${pages || '—'}},\n  year={${year}}${doi ? `,\n  doi={${doi}}` : ''}\n}`
   };
 
   const handleCopyCitation = () => {

@@ -24,9 +24,9 @@ export function generatePublishedArticlePdfBlob(
   const year = article.year || 2026;
   const volume = article.volume || 1;
   const issue = article.issue || 1;
-  const pages = article.pages || '74–96';
-  const doi = article.doi || `10.5281/chssh.${year}.${volume}${issue}${article.trackingId?.replace(/\D/g, '').slice(-4) || '1115'}`;
-  const trackingId = article.trackingId || 'CHSSH-2026-5522';
+  const pages = article.pages || '';
+  const doi = article.doi || '';
+  const trackingId = article.trackingId || '';
 
   const checkPageBreak = (neededHeight: number) => {
     if (cursorY + neededHeight > pageHeight - margin - 30) {
@@ -73,8 +73,12 @@ export function generatePublishedArticlePdfBlob(
     margin + 12,
     cursorY + 30
   );
+  const pubMetaParts: string[] = [`Vol. ${volume}, Issue ${issue} (${year})`];
+  if (pages) pubMetaParts.push(`Pages: ${pages}`);
+  if (doi) pubMetaParts.push(`DOI: https://doi.org/${doi}`);
+  pubMetaParts.push('Gold Open Access (CC BY 4.0)');
   doc.text(
-    `Vol. ${volume}, Issue ${issue} (${year})  |  Pages: ${pages}  |  DOI: https://doi.org/${doi}  |  Gold Open Access (CC BY 4.0)`,
+    pubMetaParts.join('  |  '),
     margin + 12,
     cursorY + 44
   );
@@ -88,7 +92,10 @@ export function generatePublishedArticlePdfBlob(
   doc.text(`RESEARCH ARTICLE  •  ${(article.track || 'Social Sciences & Humanities').toUpperCase()}`, margin, cursorY);
   doc.setTextColor(115, 115, 115);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Tracking ID: ${trackingId}  |  Published: ${article.publishedDate || '2026-09-30'}`, pageWidth - margin, cursorY, { align: 'right' });
+  const rightMeta = [trackingId ? `Tracking ID: ${trackingId}` : '', article.publishedDate ? `Published: ${article.publishedDate}` : ''].filter(Boolean).join('  |  ');
+  if (rightMeta) {
+    doc.text(rightMeta, pageWidth - margin, cursorY, { align: 'right' });
+  }
 
   cursorY += 14;
   doc.setDrawColor(220, 220, 220);

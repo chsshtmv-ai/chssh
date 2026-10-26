@@ -117,45 +117,6 @@ export const Archive: React.FC = () => {
       volMap.get(iss.volumeNumber)!.push(iss);
     });
 
-    // Also support fallback for published articles that don't belong to any existing issue record
-    publishedArticles.forEach(art => {
-      const artYear = art.year || 2026;
-      const artVol = art.volume || 1;
-      const artIss = art.issue || 1;
-
-      if (selectedYear !== 'all' && artYear !== Number(selectedYear)) return;
-      if (selectedVolume !== 'all' && artVol !== Number(selectedVolume)) return;
-
-      if (!yearsMap.has(artYear)) {
-        yearsMap.set(artYear, new Map());
-      }
-      const volMap = yearsMap.get(artYear)!;
-      if (!volMap.has(artVol)) {
-        volMap.set(artVol, []);
-      }
-      const existingIssues = volMap.get(artVol)!;
-      let foundIssue = existingIssues.find(i => i.issueNumber === artIss);
-      if (!foundIssue) {
-        foundIssue = {
-          id: `virtual-iss-${artVol}-${artIss}`,
-          volumeId: `vol-${artVol}`,
-          volumeNumber: artVol,
-          issueNumber: artIss,
-          year: artYear,
-          title: `Volume ${artVol}, Issue ${artIss}`,
-          publicationDate: art.publishedDate || `${artYear}-09-30`,
-          articleIds: [art.id],
-          status: 'published',
-          isCurrent: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        };
-        existingIssues.push(foundIssue);
-      } else if (!foundIssue.articleIds.includes(art.id)) {
-        foundIssue.articleIds.push(art.id);
-      }
-    });
-
     // Sort issues inside each volume descending
     yearsMap.forEach(volMap => {
       volMap.forEach(issList => {
@@ -199,10 +160,10 @@ export const Archive: React.FC = () => {
         }> = [];
 
         issuesList.forEach(iss => {
-          // Resolve articles in this issue
+          // Resolve articles in this issue (only explicitly published articles)
           let matchedArticles = iss.articleIds
             .map(id => articles.find(a => a.id === id))
-            .filter(Boolean) as Article[];
+            .filter((a): a is Article => !!a && a.status === 'published');
 
           if (matchedArticles.length === 0) {
             matchedArticles = publishedArticles.filter(

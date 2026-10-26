@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper function for admin authorization
+    function isChsshAdmin() {
+      return request.auth != null
+        && request.auth.token.email.lower() == 'chsshtmv@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    // Public read for all published research papers, covers, and templates
+    // Write/Upload/Delete restricted strictly to chsshtmv@gmail.com
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if isChsshAdmin();
+    }
+  }
+}

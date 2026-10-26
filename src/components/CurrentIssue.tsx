@@ -60,33 +60,33 @@ export const CurrentIssue: React.FC = () => {
 
   const publishedArticles = articles.filter((a) => a.status === 'published');
   
-  // Dynamically resolve Current Issue from managed issues collection
+  // Dynamically resolve Current Issue from managed published issues collection
   const currentIssueRecord =
-    issues.find((i) => i.isCurrent && i.status === 'published') ||
-    issues.find((i) => i.isCurrent) ||
-    issues.find((i) => i.status === 'published') ||
-    issues[0];
+    issues.find((i) => i.isCurrent && (i.status === 'published' || !i.status)) ||
+    issues.find((i) => i.status === 'published');
 
   const activeVolume = currentIssueRecord ? currentIssueRecord.volumeNumber : (publishedArticles[0]?.volume || 1);
   const activeIssue = currentIssueRecord ? currentIssueRecord.issueNumber : (publishedArticles[0]?.issue || 1);
   const activeYear = currentIssueRecord ? currentIssueRecord.year : (publishedArticles[0]?.year || 2026);
 
-  // Articles specifically ordered for this issue if configured, else all published articles belonging to this volume/issue
+  // Articles specifically ordered for this issue if configured, else published articles belonging to this volume/issue
   let currentArticles: Article[] = [];
   if (currentIssueRecord && currentIssueRecord.articleIds && currentIssueRecord.articleIds.length > 0) {
     const ordered = currentIssueRecord.articleIds
       .map((id) => articles.find((a) => a.id === id))
-      .filter(Boolean) as Article[];
+      .filter((a): a is Article => !!a && a.status === 'published');
     if (ordered.length > 0) {
       currentArticles = ordered;
     }
   }
 
-  if (currentArticles.length === 0) {
+  if (currentArticles.length === 0 && currentIssueRecord) {
     const matched = publishedArticles.filter(
       (a) => a.volume === activeVolume && a.issue === activeIssue
     );
-    currentArticles = matched.length > 0 ? matched : publishedArticles;
+    currentArticles = matched;
+  } else if (!currentIssueRecord) {
+    currentArticles = publishedArticles;
   }
 
   const filteredArticles = filterQuery.trim()
@@ -407,7 +407,7 @@ export const CurrentIssue: React.FC = () => {
                     {article.track}
                   </span>
                   <span className="text-stone-500 font-mono text-[11px]">
-                    Pages: {article.pages || '1–24'} | Vol. {article.volume || 7}, No. {article.issue || 1}
+                    Pages: {article.pages || '—'} | Vol. {article.volume || activeVolume || 1}, No. {article.issue || activeIssue || 1}
                   </span>
                 </div>
 
