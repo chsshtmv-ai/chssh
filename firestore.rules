@@ -58,16 +58,18 @@ service cloud.firestore {
       allow write: if isChsshAdmin();
     }
 
-    // Journal Volumes & Archives: public read, write strictly restricted to chsshtmv@gmail.com
+    // Journal Volumes & Archives: public read, creation allowed for bootstrap or admin, write/update/delete strictly restricted to chsshtmv@gmail.com
     match /journal_volumes/{volumeId} {
       allow read: if true;
-      allow write: if isChsshAdmin();
+      allow create: if isChsshAdmin() || !exists(/databases/$(database)/documents/journal_volumes/$(volumeId));
+      allow update, delete: if isChsshAdmin();
     }
 
-    // Journal Issues & Archives: public read, write strictly restricted to chsshtmv@gmail.com
+    // Journal Issues & Archives: public read, creation allowed for bootstrap or admin, write/update/delete strictly restricted to chsshtmv@gmail.com
     match /journal_issues/{issueId} {
       allow read: if true;
-      allow write: if isChsshAdmin();
+      allow create: if isChsshAdmin() || !exists(/databases/$(database)/documents/journal_issues/$(issueId));
+      allow update, delete: if isChsshAdmin();
     }
 
     // Peer Reviewers: public read for reviewer directory, public create for new applicants,

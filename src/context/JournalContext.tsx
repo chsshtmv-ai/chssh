@@ -887,14 +887,14 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setArticles(remoteArticles);
           } else {
-            setArticles(prev => (prev.length > 0 ? prev : initialArticles));
+            setArticles(initialArticles);
           }
           setFirebaseStatus('connected');
           setLastSyncedAt(new Date());
         },
         (error) => {
-          console.warn('Firestore articles listener note:', error.message);
-          setFirebaseStatus('connected');
+          console.error('Firestore articles listener error:', error.message);
+          setFirebaseStatus('error');
         }
       );
 
@@ -1136,7 +1136,12 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             remoteVolumes.sort((a, b) => b.volumeNumber - a.volumeNumber);
             setVolumes(remoteVolumes);
           } else {
-            setVolumes(prev => (prev.length > 0 ? prev : initialVolumes));
+            setVolumes(initialVolumes);
+            try {
+              for (const vol of initialVolumes) {
+                setDoc(doc(db, 'journal_volumes', vol.id), cleanForFirestore(vol)).catch(() => {});
+              }
+            } catch {}
           }
         },
         (error) => {
@@ -1159,7 +1164,12 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setIssues(remoteIssues);
           } else {
-            setIssues(prev => (prev.length > 0 ? prev : initialIssues));
+            setIssues(initialIssues);
+            try {
+              for (const iss of initialIssues) {
+                setDoc(doc(db, 'journal_issues', iss.id), cleanForFirestore(iss)).catch(() => {});
+              }
+            } catch {}
           }
         },
         (error) => {
@@ -2918,6 +2928,19 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const ref = doc(db, 'journal_issues', iss.id);
         batch.set(ref, cleanForFirestore(iss), { merge: true });
       });
+      if (target.articleIds && target.articleIds.length > 0) {
+        target.articleIds.forEach(artId => {
+          const artRef = doc(db, 'articles', artId);
+          batch.set(artRef, {
+            status: 'published',
+            volume: target.volumeNumber,
+            issue: target.issueNumber,
+            year: target.year,
+            publishedDate: today,
+            lastUpdatedDate: today
+          }, { merge: true });
+        });
+      }
       await batch.commit();
     } catch (err) {
       console.warn('Firestore publishIssue error:', err);
@@ -2929,14 +2952,23 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const unpublishIssue = async (issueId: string): Promise<boolean> => {
     if (!assertAdmin('unpublishIssue')) return false;
     const now = new Date().toISOString();
+    const target = issues.find(i => i.id === issueId);
     setIssues(prev =>
       prev.map(iss =>
         iss.id === issueId ? { ...iss, status: 'draft', isCurrent: false, updatedAt: now } : iss
       )
     );
     try {
+      const batch = writeBatch(db);
       const issueRef = doc(db, 'journal_issues', issueId);
-      await updateDoc(issueRef, { status: 'draft', isCurrent: false, updatedAt: now });
+      batch.update(issueRef, { status: 'draft', isCurrent: false, updatedAt: now });
+      if (target?.articleIds && target.articleIds.length > 0) {
+        target.articleIds.forEach(artId => {
+          const artRef = doc(db, 'articles', artId);
+          batch.set(artRef, { status: 'accepted', lastUpdatedDate: now }, { merge: true });
+        });
+      }
+      await batch.commit();
       return true;
     } catch (err) {
       console.warn(err);
