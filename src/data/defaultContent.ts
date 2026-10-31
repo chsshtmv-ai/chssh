@@ -226,12 +226,77 @@ export const initialJournalContent: JournalContent = {
   item_template_desc: "Official double-blind compliant author template with pre-configured heading hierarchies, abstract & keyword formatting, APA 7th / Chicago citation rules, and embedded figure/table layout standards.",
   item_template_badge: "Mandatory for Authors",
   item_toc_title: "Complete Issue Table of Contents & Editorial Index",
-  item_toc_desc: "Comprehensive catalog of Volume 7, Issue 1 with article DOIs, author institutional affiliations, page numbering (pp. 1 128), Editor-in-Chief foreword, and scientific board registry.",
+  item_toc_desc: "Comprehensive catalog of Volume 7, Issue 1 with article DOIs, author institutional affiliations, page numbering (pp. 1–128), Editor-in-Chief foreword, and scientific board registry.",
   item_toc_badge: "Volume Catalog",
   item_cert_title: "Official Certificate of Publication & Academic Merit",
   item_cert_desc: "Formal credential awarded to published authors and co-authors with anti-counterfeit guilloche borders, journal verification QR code, digital security ID, and Editor-in-Chief signature.",
   item_cert_badge: "Author Credential",
   item_plagiarism_title: "COPE Author Plagiarism & Originality Declaration Certificate",
   item_plagiarism_desc: "Mandatory scholarly warranty affirming manuscript originality, zero uncredited content, ethical AI tool attribution, and copyright compliance as required by the Committee on Publication Ethics.",
-  item_plagiarism_badge: "Required for Review"
+  item_plagiarism_badge: "Required for Review",
+
+  // CMS Homepage Announcements & Banners
+  home_announcement_enabled: "true",
+  home_announcement_badge: "Editorial Announcement",
+  home_announcement_title: "Volume 7, Issue 1 Published Online with Open Access & Crossref DOIs",
+  home_announcement_text: "All peer-reviewed research papers in the inaugural volume are now permanently accessible with permanent Crossref DOIs and open download access for scholars worldwide.",
+  home_announcement_date: "October 2026",
+  home_announcement_link: "",
+  homepage_banner_url: "",
+  call_for_papers_banner_url: "",
+
+  // CMS Section Visibility Toggles
+  show_hero_stats: "true",
+  show_announcements: "true",
+  show_call_for_papers: "true",
+  show_latest_articles: "true",
+  show_indexing_partners: "true",
+
+  // CMS About Journal Manager
+  about_badge: "About the Journal",
+  about_title: "About Contemporary Horizons in Social Sciences and Humanities",
+  about_subtitle: "An International, Peer-Reviewed, Open-Access Forum for Critical Academic Inquiry",
+  about_description: "Contemporary Horizons in Social Sciences and Humanities (CHSSH) is dedicated to advancing theoretical, empirical, and interdisciplinary inquiries. The journal brings together distinguished and emerging scholars across sociology, anthropology, political theory, digital humanities, philosophy, and cultural studies.",
+  about_history_title: "Journal History & Founding",
+  about_history_text: "Founded to bridge the traditional divide between quantitative sociological methodologies and qualitative humanistic critiques, CHSSH provides an open platform free of corporate subscription paywalls. The journal was founded with the commitment to equitable scholarship and rigorous double-blind peer review.",
+  about_objectives_title: "Objectives & Mission",
+  about_objectives_text: "Our core objectives are: (1) To publish high-impact, methodologically rigorous research that addresses contemporary crises; (2) To foster global intellectual exchange across diverse geographical regions; (3) To maintain uncompromising academic integrity and transparent double-blind review; (4) To uphold unconditional Gold Open Access so that academic knowledge remains accessible to all.",
+  about_mission_title: "Scholarly Mission & Scope",
+  about_mission_text: "CHSSH champions academic freedom, epistemic justice, and interdisciplinary collaboration. We actively encourage submissions that challenge orthodox frameworks and propose novel methodologies for analyzing cultural, institutional, and technological transformations.",
+  about_policies_title: "Governance & Archival Policies",
+  about_policies_text: "CHSSH operates under standard Committee on Publication Ethics (COPE) core practices. All articles receive permanent digital object identifiers (DOIs) via Crossref and are archived in Portico and PKP Preservation Network for permanent preservation.",
+  about_indexing_summary: "Indexed in Google Scholar, Crossref, DOAJ evaluation roster, and PKP preservation network.",
+
+  // CMS Author Guidelines Extra
+  guidelines_referencing_heading: "3. Referencing & Citation Guidelines",
+  guidelines_referencing_text: "Authors should format citations and reference lists consistently in APA 7th Edition or Chicago 17th Author-Date format. All references must include functional DOI links (https://doi.org/...) where available. Endnotes should be used sparingly and placed before the reference list.",
+  guidelines_submission_checklist: "• Original manuscript in Microsoft Word (.docx) format\n• Fully anonymized main file with no author names or institutional mentions\n• Separate Title Page file with author names, affiliations, emails, and ORCIDs\n• Abstract between 150–250 words with 4–6 representative keywords\n• Signed COPE Plagiarism & Originality Declaration\n• High-resolution figures and tables embedded at appropriate positions",
+
+  // CMS Publication Ethics Manager
+  ethics_badge: "COPE Ethical Standards",
+  ethics_title: "Publication Ethics & Malpractice Policy",
+  ethics_subtitle: "Upholding rigorous international ethical guidelines and academic integrity across all editorial stages",
+  ethics_plagiarism_heading: "1. Plagiarism & Originality Policy",
+  ethics_plagiarism_text: "CHSSH enforces zero tolerance for plagiarism, duplicate submission, self-plagiarism, and uncredited intellectual borrowing. All submissions undergo algorithmic similarity screening via Crossref Similarity Check (iThenticate). Manuscripts displaying similarity indices above 15% (excluding bibliography and common terminology) are rejected immediately.",
+  ethics_coi_heading: "2. Conflict of Interest & Funding Disclosures",
+  ethics_coi_text: "Authors must declare all financial support, institutional sponsorships, and personal or professional conflicts of interest upon manuscript submission. Peer reviewers and editors must recuse themselves from handling any manuscript where a personal or institutional relationship could influence impartial assessment.",
+  ethics_correction_heading: "3. Correction & Errata Guidelines",
+  ethics_correction_text: "If an author or reader identifies a factual inaccuracy in a published article that does not undermine the scholarly conclusions, CHSSH will issue a formal Erratum or Corrigendum linked to the original DOI.",
+  ethics_retraction_heading: "4. Retraction Guidelines",
+  ethics_retraction_text: "In cases of proven academic misconduct, severe data falsification, fraudulent authorship, or fundamental methodological invalidity, the journal follows the COPE Retraction Guidelines. A formal Notice of Retraction is permanently published and watermarked onto the PDF record.",
+
+  // CMS Contact Page Manager
+  contact_badge: "Get in Touch",
+  contact_subtitle: "Contact our editorial office for editorial inquiries, submission status questions, and academic partnerships",
+  contact_instructions: "For manuscript queries, please include your submission tracking ID (e.g., CHSSH-2026-XXXX) in the subject line to ensure prompt routing to the managing editor.",
+  contact_response_time: "Our editorial secretariat responds to all inquiries within 2 business days.",
+
+  // CMS Header & Footer Manager
+  journal_logo_url: "",
+  journal_crest_text: "CHSSH",
+  footer_description: "Contemporary Horizons in Social Sciences and Humanities (CHSSH) is a premier international academic journal committed to rigorous scholarship, unconditional open access, and ethical peer review.",
+  footer_links_heading: "Quick Navigation",
+  footer_contact_heading: "Editorial Secretariat",
+  footer_indexing_heading: "Digital Archiving",
+  footer_disclaimer: "All articles published in Contemporary Horizons in Social Sciences and Humanities are distributed under the Creative Commons Attribution 4.0 International License (CC BY 4.0)."
 };

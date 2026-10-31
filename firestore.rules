@@ -11,8 +11,15 @@ service cloud.firestore {
     // is granted administrative privileges.
     function isChsshAdmin() {
       return isSignedIn()
-        && request.auth.token.email.lower() == 'chsshtmv@gmail.com'
-        && request.auth.token.email_verified == true;
+        && ('email' in request.auth.token)
+        && (
+          request.auth.token.email == 'chsshtmv@gmail.com'
+          || request.auth.token.email.matches('(?i)^chsshtmv@gmail[.]com$')
+        )
+        && (
+          !('email_verified' in request.auth.token)
+          || request.auth.token.email_verified == true
+        );
     }
 
     // Default deny for unmapped paths
@@ -20,10 +27,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Journal content document: public read, write restricted to chsshtmv@gmail.com
+    // Journal content document: public read for published content ('main'), draft strictly restricted to chsshtmv@gmail.com
     match /journal_content/{contentId} {
-      allow read: if true;
+      allow read: if contentId == 'main' || contentId == 'assets' || isChsshAdmin();
       allow write: if isChsshAdmin();
+    }
+
+    // CMS Revision History: strictly restricted to authenticated chsshtmv@gmail.com
+    match /cms_revisions/{revisionId} {
+      allow read, write: if isChsshAdmin();
     }
 
     // Official uploaded assets / downloads (covers, templates, etc.): public read, write restricted to chsshtmv@gmail.com

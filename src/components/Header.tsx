@@ -22,7 +22,9 @@ import {
   Download,
   Award,
   User,
-  LogOut
+  LogOut,
+  Info,
+  Mail
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -48,6 +50,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAdminLogin }) => {
 
   const mainNavItems = [
     { id: 'home', labelKey: 'nav_home', defaultLabel: 'Home', icon: Compass },
+    { id: 'about', labelKey: 'nav_about', defaultLabel: 'About', icon: Info },
     { id: 'current', labelKey: 'nav_current', defaultLabel: 'Current Issue', icon: BookOpen },
     { id: 'archive', labelKey: 'nav_archive', defaultLabel: 'Archive & Search', icon: Search },
     { id: 'aims', labelKey: 'nav_aims', defaultLabel: 'Aims & Scope', icon: Bookmark },
@@ -56,7 +59,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAdminLogin }) => {
     { id: 'advisory', labelKey: 'nav_advisory', defaultLabel: 'Advisory Board', icon: GraduationCap },
     { id: 'reviewers', labelKey: 'nav_reviewers', defaultLabel: 'Reviewers', icon: Award },
     { id: 'submit', labelKey: 'nav_submit', defaultLabel: 'Submit Manuscript', icon: Send },
-    { id: 'track', labelKey: 'nav_track', defaultLabel: 'Track Submission', icon: Search }
+    { id: 'track', labelKey: 'nav_track', defaultLabel: 'Track Submission', icon: Search },
+    { id: 'contact', labelKey: 'nav_contact', defaultLabel: 'Contact', icon: Mail }
   ];
 
   const dynamicNavItems = [

@@ -49,6 +49,18 @@ import { DocumentPreviewModal } from '../DocumentPreviewModal';
 import { triggerFileDownload } from '../../utils/downloadGenerators';
 import { getAssetFile } from '../../utils/fileStorage';
 import { validatePdfFile, getFreshPdfUrl } from '../../services/pdfStorageService';
+import { CmsPublishToolbar } from './cms/CmsPublishToolbar';
+import { CmsRevisionsModal } from './cms/CmsRevisionsModal';
+import { AdminHomepageManager } from './cms/AdminHomepageManager';
+import { AdminAboutManager } from './cms/AdminAboutManager';
+import { AdminAimsManager } from './cms/AdminAimsManager';
+import { AdminGuidelinesManager } from './cms/AdminGuidelinesManager';
+import { AdminEthicsManager } from './cms/AdminEthicsManager';
+import { AdminEditorialInfoManager } from './cms/AdminEditorialInfoManager';
+import { AdminContactManager } from './cms/AdminContactManager';
+import { AdminHeaderFooterManager } from './cms/AdminHeaderFooterManager';
+import { AdminDesignManager } from './cms/AdminDesignManager';
+import { AdminOtherPagesManager } from './cms/AdminOtherPagesManager';
 
 export const AdminPanel: React.FC = () => {
   const {
@@ -131,6 +143,8 @@ export const AdminPanel: React.FC = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [docSlotTabs, setDocSlotTabs] = useState<Record<string, 'manage' | 'publish'>>({});
+  const [cmsActiveSection, setCmsActiveSection] = useState<'home' | 'about' | 'aims' | 'guidelines' | 'ethics' | 'editorial' | 'contact' | 'header_footer' | 'design' | 'other'>('home');
+  const [isRevisionsModalOpen, setIsRevisionsModalOpen] = useState(false);
 
   if (!isAdmin) {
     const isUnauthorizedGoogleAccount = Boolean(
@@ -669,103 +683,80 @@ export const AdminPanel: React.FC = () => {
       {/* SUBTAB: Typesetting & DOIs */}
       {adminActiveSubTab === 'publication' && <AdminPublicationSection />}
 
-      {/* SUBTAB: Site Texts CMS */}
+      {/* SUBTAB: Complete CMS Suite */}
       {adminActiveSubTab === 'texts' && (
-        <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-6 shadow-2xs space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-stone-800 pb-4">
-            <div>
-              <h2 className="text-lg font-serif font-bold text-slate-900 dark:text-slate-100">
-                Site Texts &amp; Editorial Policies CMS
-              </h2>
-              <p className="text-xs text-slate-500">
-                Edit website texts in real time. Changes synchronize with Google Cloud Firestore.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm('Reset all website texts to scholarly defaults?')) {
-                    resetContentToDefault();
-                  }
-                }}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-stone-700 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 cursor-pointer"
-              >
-                Reset to Defaults
-              </button>
+        <div className="space-y-6">
+          {/* 1. Global Publishing Workflow Toolbar */}
+          <CmsPublishToolbar
+            onOpenRevisions={() => setIsRevisionsModalOpen(true)}
+            sectionName={`CMS Manager: ${
+              cmsActiveSection === 'home'
+                ? 'Homepage'
+                : cmsActiveSection === 'about'
+                ? 'About Journal'
+                : cmsActiveSection === 'aims'
+                ? 'Aims & Scope'
+                : cmsActiveSection === 'guidelines'
+                ? 'Author Guidelines'
+                : cmsActiveSection === 'ethics'
+                ? 'Publication Ethics'
+                : cmsActiveSection === 'editorial'
+                ? 'Editorial & Reviewers'
+                : cmsActiveSection === 'contact'
+                ? 'Contact Page'
+                : cmsActiveSection === 'header_footer'
+                ? 'Header & Footer'
+                : cmsActiveSection === 'design'
+                ? 'Design & Appearance'
+                : 'Other Public Pages'
+            }`}
+          />
+
+          {/* 2. CMS Navigation Pills */}
+          <div className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-2 shadow-2xs overflow-x-auto">
+            <div className="flex items-center gap-1.5 min-w-max text-xs font-medium">
+              {[
+                { id: 'home', label: 'A. Homepage' },
+                { id: 'about', label: 'B. About Journal' },
+                { id: 'aims', label: 'C. Aims & Scope' },
+                { id: 'guidelines', label: 'D. Guidelines' },
+                { id: 'ethics', label: 'E. Ethics' },
+                { id: 'editorial', label: 'F. Editorial Info' },
+                { id: 'contact', label: 'G. Contact Page' },
+                { id: 'header_footer', label: 'H. Header & Footer' },
+                { id: 'design', label: 'I. Design' },
+                { id: 'other', label: 'J. Other Pages' }
+              ].map((tab) => {
+                const isActive = cmsActiveSection === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setCmsActiveSection(tab.id as any)}
+                    className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                      isActive
+                        ? 'bg-[#102344] text-white font-bold shadow-xs'
+                        : 'text-stone-600 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Journal Full Name
-              </label>
-              <input
-                type="text"
-                value={content.journal_name || ''}
-                onChange={(e) => updateContentText('journal_name', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100 font-serif"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Journal Tagline / Scope Description
-              </label>
-              <input
-                type="text"
-                value={content.journal_tagline || ''}
-                onChange={(e) => updateContentText('journal_tagline', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Online ISSN
-              </label>
-              <input
-                type="text"
-                value={content.issn_online || ''}
-                onChange={(e) => updateContentText('issn_online', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100 font-mono"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Print ISSN
-              </label>
-              <input
-                type="text"
-                value={content.issn_print || ''}
-                onChange={(e) => updateContentText('issn_print', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100 font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                DOI Prefix
-              </label>
-              <input
-                type="text"
-                value={content.doi_prefix || ''}
-                onChange={(e) => updateContentText('doi_prefix', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100 font-mono"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Editorial Contact Email
-              </label>
-              <input
-                type="text"
-                value={content.contact_email || ''}
-                onChange={(e) => updateContentText('contact_email', e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
-              />
-            </div>
-          </div>
+          {/* 3. Section Manager Views */}
+          {cmsActiveSection === 'home' && <AdminHomepageManager />}
+          {cmsActiveSection === 'about' && <AdminAboutManager />}
+          {cmsActiveSection === 'aims' && <AdminAimsManager />}
+          {cmsActiveSection === 'guidelines' && <AdminGuidelinesManager />}
+          {cmsActiveSection === 'ethics' && <AdminEthicsManager />}
+          {cmsActiveSection === 'editorial' && <AdminEditorialInfoManager />}
+          {cmsActiveSection === 'contact' && <AdminContactManager />}
+          {cmsActiveSection === 'header_footer' && <AdminHeaderFooterManager />}
+          {cmsActiveSection === 'design' && <AdminDesignManager />}
+          {cmsActiveSection === 'other' && <AdminOtherPagesManager />}
         </div>
       )}
 
@@ -1368,6 +1359,12 @@ export const AdminPanel: React.FC = () => {
             );
           }
         }}
+      />
+
+      {/* CMS Revision History & Rollback Modal */}
+      <CmsRevisionsModal
+        isOpen={isRevisionsModalOpen}
+        onClose={() => setIsRevisionsModalOpen(false)}
       />
     </div>
   );

@@ -19,6 +19,9 @@ import { TrackSubmission } from './components/TrackSubmission';
 import { DownloadsView } from './components/DownloadsView';
 import { AuthorDashboard } from './components/AuthorDashboard';
 import { AdminPanel } from './components/admin/AdminPanel';
+import { AboutJournalView } from './components/AboutJournalView';
+import { ContactView } from './components/ContactView';
+import { CmsPreviewBar } from './components/CmsPreviewBar';
 
 function JournalApp() {
   const {
@@ -37,6 +40,8 @@ function JournalApp() {
     switch (activeTab) {
       case 'home':
         return <HomeHero />;
+      case 'about':
+        return <AboutJournalView />;
       case 'current':
         return <CurrentIssue />;
       case 'archive':
@@ -57,6 +62,8 @@ function JournalApp() {
         return <TrackSubmission />;
       case 'downloads':
         return <DownloadsView />;
+      case 'contact':
+        return <ContactView />;
       case 'author-dashboard':
         return <AuthorDashboard />;
       case 'admin':
@@ -68,6 +75,7 @@ function JournalApp() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fbfaf8] dark:bg-[#0c0d10] text-slate-800 dark:text-slate-200 font-sans selection:bg-[#102344] selection:text-white transition-colors duration-200">
+      <CmsPreviewBar />
       <AdminBar />
       <Header
         onOpenAdminLogin={() => {

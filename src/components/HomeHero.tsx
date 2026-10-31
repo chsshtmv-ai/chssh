@@ -21,8 +21,11 @@ export const HomeHero: React.FC = () => {
     articles,
     setActiveTab,
     setSelectedArticleForView,
-    downloadPublishedPaper
+    downloadPublishedPaper,
+    activeContent,
+    content
   } = useJournal();
+  const currentContent = activeContent || content;
   const [selectedTrack, setSelectedTrack] = useState<string>('all');
 
   const hasUploadedPublishedPaper = (art: any) => Boolean(
@@ -143,9 +146,36 @@ export const HomeHero: React.FC = () => {
               <EditableText id="hero_cta_downloads" placeholder="Templates & Downloads" />
             </motion.button>
           </motion.div>
+
+          {/* Editorial Announcements Callout Banner */}
+          {currentContent.show_announcements !== 'false' && (currentContent.announcement_text || currentContent.announcement_badge) && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+              className="max-w-4xl mx-auto pt-3 text-left"
+            >
+              <div className="bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs backdrop-blur-xs">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider bg-amber-500 text-slate-950 font-mono shrink-0">
+                    <EditableText id="announcement_badge" placeholder="Announcement" />
+                  </span>
+                  <span className="text-xs text-slate-800 dark:text-slate-200 font-serif leading-snug">
+                    <EditableText id="announcement_text" placeholder="Submissions are currently invited for the upcoming issue." />
+                  </span>
+                </div>
+                {currentContent.announcement_date && (
+                  <span className="text-[11px] text-amber-900 dark:text-amber-200 font-mono font-semibold shrink-0">
+                    <EditableText id="announcement_date" placeholder="Deadline: Nov 30" />
+                  </span>
+                )}
+              </div>
+            </motion.div>
+          )}
         </div>
 
         {/* Scholarly Metrics */}
+        {currentContent.show_hero_stats !== 'false' && (
         <div className="max-w-6xl mx-auto mt-10 px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <motion.div
@@ -226,9 +256,11 @@ export const HomeHero: React.FC = () => {
             </motion.div>
           </div>
         </div>
+        )}
       </section>
 
       {/* Special Call for Papers Banner */}
+      {currentContent.show_call_for_papers !== 'false' && (
       <section aria-labelledby="call-for-papers-heading" className="max-w-6xl mx-auto px-4">
         <motion.div
           whileHover={{ scale: 1.005 }}
@@ -279,6 +311,7 @@ export const HomeHero: React.FC = () => {
           </div>
         </motion.div>
       </section>
+      )}
 
       {/* Featured Research Articles */}
       <section className="max-w-6xl mx-auto px-4 space-y-6">

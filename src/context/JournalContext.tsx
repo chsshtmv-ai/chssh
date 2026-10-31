@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { JournalContent, Article, EditorialMember, AdvisoryBoardMember, ArticleStatus, JournalUploadedAsset, Reviewer, AuthorAccount, JournalPalette, JournalVolume, JournalIssue } from '../types';
+import { JournalContent, Article, EditorialMember, AdvisoryBoardMember, ArticleStatus, JournalUploadedAsset, Reviewer, AuthorAccount, JournalPalette, JournalVolume, JournalIssue, CmsRevision } from '../types';
 import { initialJournalContent } from '../data/defaultContent';
 import { initialArticles, initialEditorialBoard } from '../data/defaultArticles';
 import { initialAdvisoryBoard } from '../data/defaultAdvisoryBoard';
@@ -83,6 +83,23 @@ export type FirebaseConnectionStatus = 'connected' | 'connecting' | 'error' | 's
 
 interface JournalContextType {
   content: JournalContent;
+  draftContent: JournalContent;
+  activeContent: JournalContent;
+  isPreviewMode: boolean;
+  togglePreviewMode: () => void;
+  setIsPreviewMode: (val: boolean) => void;
+  hasUnpublishedChanges: boolean;
+  cmsRevisions: CmsRevision[];
+  isSavingDraft: boolean;
+  isPublishingDraft: boolean;
+  lastDraftSavedAt: string | null;
+  lastPublishedAt: string | null;
+  updateDraftContentText: (key: keyof JournalContent, value: string) => void;
+  updateDraftSection: (updates: Partial<JournalContent>) => void;
+  saveDraftToFirestore: () => Promise<{ success: boolean; error?: string }>;
+  publishDraftToFirestore: (summary?: string) => Promise<{ success: boolean; error?: string }>;
+  revertToRevision: (revisionId: string) => Promise<{ success: boolean; error?: string }>;
+  discardDraftChanges: () => void;
   articles: Article[];
   editorialBoard: EditorialMember[];
   advisoryBoard: AdvisoryBoardMember[];
@@ -356,6 +373,48 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
     return initialJournalContent;
   });
+
+  const [draftContent, setDraftContent] = useState<JournalContent>(() => {
+    try {
+      const saved = localStorage.getItem('chssh_cms_draft_content');
+      if (saved) {
+        return { ...initialJournalContent, ...JSON.parse(saved) };
+      }
+      const savedMain = localStorage.getItem('chssh_journal_content');
+      if (savedMain) {
+        return { ...initialJournalContent, ...JSON.parse(savedMain) };
+      }
+    } catch (e) {
+      console.error('Error loading local CMS draft', e);
+    }
+    return initialJournalContent;
+  });
+
+  const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
+  const [cmsRevisions, setCmsRevisions] = useState<CmsRevision[]>([]);
+  const [isSavingDraft, setIsSavingDraft] = useState<boolean>(false);
+  const [isPublishingDraft, setIsPublishingDraft] = useState<boolean>(false);
+  const [lastDraftSavedAt, setLastDraftSavedAt] = useState<string | null>(() => {
+    return localStorage.getItem('chssh_cms_last_draft_saved') || null;
+  });
+  const [lastPublishedAt, setLastPublishedAt] = useState<string | null>(() => {
+    return localStorage.getItem('chssh_cms_last_published') || null;
+  });
+
+  const activeContent = isPreviewMode ? draftContent : content;
+
+  const hasUnpublishedChanges = React.useMemo(() => {
+    if (!draftContent || !content) return false;
+    const keys = Object.keys({ ...draftContent, ...content }) as (keyof JournalContent)[];
+    return keys.some(k => {
+      if (k === 'updatedAt' as any) return false;
+      return draftContent[k] !== content[k];
+    });
+  }, [draftContent, content]);
+
+  const togglePreviewMode = () => {
+    setIsPreviewMode(prev => !prev);
+  };
 
   const [articles, setArticles] = useState<Article[]>(() => {
     try {
@@ -1459,6 +1518,24 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     sessionStorage.removeItem('chssh_is_admin');
   };
 
+  const assertGoogleAdmin = (actionName: string): { ok: boolean; error?: string } => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return {
+        ok: false,
+        error: 'Google Sign-In Required: Please authenticate with your official administrator Google account (chsshtmv@gmail.com) to save drafts or publish changes to Firestore.'
+      };
+    }
+    const email = (currentUser.email || '').toLowerCase().trim();
+    if (email !== CHSSH_ADMIN_EMAIL.toLowerCase()) {
+      return {
+        ok: false,
+        error: `Unauthorized Account: ${currentUser.email} is not authorized for CHSSH administration. Access is restricted exclusively to ${CHSSH_ADMIN_EMAIL}.`
+      };
+    }
+    return { ok: true };
+  };
+
   const assertAdmin = (actionName: string): boolean => {
     const currentUser = auth.currentUser;
     const email = (currentUser?.email || '').toLowerCase().trim();
@@ -1494,6 +1571,58 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       activityEvents.forEach(evt => window.removeEventListener(evt, resetTimer));
     };
   }, [isAdmin]);
+
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    const email = (currentUser?.email || '').toLowerCase().trim();
+    const isAuthorizedGoogleAdmin = Boolean(
+      currentUser &&
+      email === CHSSH_ADMIN_EMAIL.toLowerCase() &&
+      (currentUser.emailVerified ?? true)
+    );
+
+    // Only attach draft and revision history listeners when authenticated as authorized admin in Firebase Auth
+    if (!isAdmin || !isAuthorizedGoogleAdmin) return;
+
+    let unsubDraft: (() => void) | undefined;
+    let unsubRevisions: (() => void) | undefined;
+
+    try {
+      const draftDocRef = doc(db, 'journal_content', 'draft');
+      unsubDraft = onSnapshot(draftDocRef, (snap) => {
+        if (snap.exists()) {
+          const draftData = snap.data() as JournalContent;
+          setDraftContent(prev => ({ ...initialJournalContent, ...draftData }));
+          if (draftData.updatedAt) {
+            setLastDraftSavedAt(draftData.updatedAt);
+          }
+        }
+      }, (err) => {
+        console.warn('Draft snapshot note:', err.message);
+      });
+
+      const revColRef = collection(db, 'cms_revisions');
+      unsubRevisions = onSnapshot(revColRef, (snap) => {
+        if (!snap.empty) {
+          const revList: CmsRevision[] = [];
+          snap.forEach(d => {
+            revList.push(d.data() as CmsRevision);
+          });
+          revList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          setCmsRevisions(revList);
+        }
+      }, (err) => {
+        console.warn('Revisions snapshot note:', err.message);
+      });
+    } catch (e) {
+      console.warn('Admin CMS listeners error:', e);
+    }
+
+    return () => {
+      if (unsubDraft) unsubDraft();
+      if (unsubRevisions) unsubRevisions();
+    };
+  }, [isAdmin, adminUser]);
 
   const changeAdminPassword = (newPass: string): boolean => {
     if (!assertAdmin('changeAdminPassword')) return false;
@@ -1710,6 +1839,170 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (err) {
       console.warn('Firestore resetContentToDefault error:', err);
     }
+  };
+
+  const updateDraftContentText = (key: keyof JournalContent, value: string) => {
+    if (!assertAdmin('updateDraftContentText')) return;
+    const aliases: Partial<JournalContent> = {};
+    if (KEY_ALIASES[key as string]) {
+      for (const alias of KEY_ALIASES[key as string]) {
+        (aliases as any)[alias] = value;
+      }
+    }
+    const updates = { [key]: value, ...aliases };
+    setDraftContent(prev => {
+      const next = { ...prev, ...updates };
+      safeLocalStorageSet('chssh_cms_draft_content', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const updateDraftSection = (updates: Partial<JournalContent>) => {
+    if (!assertAdmin('updateDraftSection')) return;
+    setDraftContent(prev => {
+      const next = { ...prev, ...updates };
+      safeLocalStorageSet('chssh_cms_draft_content', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const saveDraftToFirestore = async (): Promise<{ success: boolean; error?: string }> => {
+    const googleCheck = assertGoogleAdmin('saveDraftToFirestore');
+    if (!googleCheck.ok) {
+      return { success: false, error: googleCheck.error };
+    }
+    if (!assertAdmin('saveDraftToFirestore')) {
+      return { success: false, error: 'Unauthorized: Only verified chsshtmv@gmail.com can save drafts.' };
+    }
+    setIsSavingDraft(true);
+    try {
+      const draftDocRef = doc(db, 'journal_content', 'draft');
+      const nowIso = new Date().toISOString();
+      await setDoc(draftDocRef, cleanForFirestore({
+        ...draftContent,
+        updatedAt: nowIso
+      }));
+      setLastDraftSavedAt(nowIso);
+      safeLocalStorageSet('chssh_cms_last_draft_saved', nowIso);
+      safeLocalStorageSet('chssh_cms_draft_content', JSON.stringify(draftContent));
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error saving CMS draft to Firestore:', err);
+      return { success: false, error: err?.message || 'Failed to save draft to Firestore.' };
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const publishDraftToFirestore = async (summary?: string): Promise<{ success: boolean; error?: string }> => {
+    const googleCheck = assertGoogleAdmin('publishDraftToFirestore');
+    if (!googleCheck.ok) {
+      return { success: false, error: googleCheck.error };
+    }
+    if (!assertAdmin('publishDraftToFirestore')) {
+      return { success: false, error: 'Unauthorized: Only verified chsshtmv@gmail.com can publish changes.' };
+    }
+    setIsPublishingDraft(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const finalContent = {
+        ...draftContent,
+        updatedAt: nowIso
+      };
+
+      const mainDocRef = doc(db, 'journal_content', 'main');
+      await setDoc(mainDocRef, cleanForFirestore(finalContent));
+
+      const draftDocRef = doc(db, 'journal_content', 'draft');
+      await setDoc(draftDocRef, cleanForFirestore(finalContent));
+
+      const revisionId = `rev-${Date.now()}`;
+      const revisionDocRef = doc(db, 'cms_revisions', revisionId);
+      const newRevision: CmsRevision = {
+        id: revisionId,
+        timestamp: nowIso,
+        publishedBy: adminUser?.email || CHSSH_ADMIN_EMAIL,
+        summary: summary || 'Published CMS updates across journal pages',
+        contentSnapshot: finalContent
+      };
+      await setDoc(revisionDocRef, cleanForFirestore(newRevision));
+
+      setContent(finalContent);
+      setDraftContent(finalContent);
+      setLastPublishedAt(nowIso);
+      setLastDraftSavedAt(nowIso);
+      setIsPreviewMode(false);
+
+      safeLocalStorageSet('chssh_cms_last_published', nowIso);
+      safeLocalStorageSet('chssh_journal_content', JSON.stringify(finalContent));
+      safeLocalStorageSet('chssh_cms_draft_content', JSON.stringify(finalContent));
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error publishing CMS changes to Firestore:', err);
+      return { success: false, error: err?.message || 'Failed to publish changes to Firestore.' };
+    } finally {
+      setIsPublishingDraft(false);
+    }
+  };
+
+  const revertToRevision = async (revisionId: string): Promise<{ success: boolean; error?: string }> => {
+    const googleCheck = assertGoogleAdmin('revertToRevision');
+    if (!googleCheck.ok) {
+      return { success: false, error: googleCheck.error };
+    }
+    if (!assertAdmin('revertToRevision')) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    const rev = cmsRevisions.find(r => r.id === revisionId);
+    if (!rev || !rev.contentSnapshot) {
+      return { success: false, error: 'Revision snapshot not found.' };
+    }
+
+    try {
+      const nowIso = new Date().toISOString();
+      const restoredContent = {
+        ...initialJournalContent,
+        ...rev.contentSnapshot,
+        updatedAt: nowIso
+      };
+
+      const mainDocRef = doc(db, 'journal_content', 'main');
+      await setDoc(mainDocRef, cleanForFirestore(restoredContent));
+
+      const draftDocRef = doc(db, 'journal_content', 'draft');
+      await setDoc(draftDocRef, cleanForFirestore(restoredContent));
+
+      const rollbackRevId = `rev-${Date.now()}`;
+      const rollbackDocRef = doc(db, 'cms_revisions', rollbackRevId);
+      const rollbackRecord: CmsRevision = {
+        id: rollbackRevId,
+        timestamp: nowIso,
+        publishedBy: adminUser?.email || CHSSH_ADMIN_EMAIL,
+        summary: `Rollback to revision ${rev.id} (${new Date(rev.timestamp).toLocaleDateString()}: ${rev.summary})`,
+        contentSnapshot: restoredContent
+      };
+      await setDoc(rollbackDocRef, cleanForFirestore(rollbackRecord));
+
+      setContent(restoredContent);
+      setDraftContent(restoredContent);
+      setLastPublishedAt(nowIso);
+      setIsPreviewMode(false);
+
+      safeLocalStorageSet('chssh_journal_content', JSON.stringify(restoredContent));
+      safeLocalStorageSet('chssh_cms_draft_content', JSON.stringify(restoredContent));
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error reverting revision:', err);
+      return { success: false, error: err?.message || 'Failed to rollback to revision.' };
+    }
+  };
+
+  const discardDraftChanges = () => {
+    setDraftContent(content);
+    safeLocalStorageSet('chssh_cms_draft_content', JSON.stringify(content));
+    setIsPreviewMode(false);
   };
 
   const submitManuscript = (data: {
@@ -3729,6 +4022,23 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <JournalContext.Provider
       value={{
         content,
+        draftContent,
+        activeContent,
+        isPreviewMode,
+        togglePreviewMode,
+        setIsPreviewMode,
+        hasUnpublishedChanges,
+        cmsRevisions,
+        isSavingDraft,
+        isPublishingDraft,
+        lastDraftSavedAt,
+        lastPublishedAt,
+        updateDraftContentText,
+        updateDraftSection,
+        saveDraftToFirestore,
+        publishDraftToFirestore,
+        revertToRevision,
+        discardDraftChanges,
         articles,
         editorialBoard,
         reviewers,

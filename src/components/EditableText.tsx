@@ -36,12 +36,13 @@ export const EditableText: React.FC<EditableTextProps> = ({
   className = '',
   placeholder = ''
 }) => {
-  const { content } = useJournal();
+  const { activeContent, content } = useJournal();
+  const sourceContent = activeContent || content;
 
-  let rawValue = content[id];
+  let rawValue = sourceContent[id];
   if ((rawValue === undefined || rawValue === null || rawValue === '') && KEY_ALIASES[id as string]) {
     for (const alias of KEY_ALIASES[id as string]) {
-      const aliasVal = content[alias as keyof JournalContent];
+      const aliasVal = sourceContent[alias as keyof JournalContent];
       if (aliasVal !== undefined && aliasVal !== null && aliasVal !== '') {
         rawValue = aliasVal;
         break;

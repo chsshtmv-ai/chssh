@@ -143,6 +143,24 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdminLogin }) => {
               <li>
                 <button
                   type="button"
+                  onClick={() => { setActiveTab('about'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="hover:text-sky-300 transition cursor-pointer"
+                >
+                  <EditableText id="nav_about" placeholder="About the Journal" />
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab('contact'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="hover:text-sky-300 transition cursor-pointer"
+                >
+                  <EditableText id="nav_contact" placeholder="Contact &amp; Editorial Office" />
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
                   onClick={() => { setActiveTab('track'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                   className="hover:text-sky-300 transition cursor-pointer"
                 >

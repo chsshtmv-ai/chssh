@@ -129,12 +129,29 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "userId", "name", "phone", "email"]
+    },
+    "CmsRevision": {
+      "title": "CmsRevision",
+      "description": "Historical snapshot of published CMS website content",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "publishedBy": { "type": "string" },
+        "summary": { "type": "string" },
+        "contentSnapshot": { "type": "object" }
+      },
+      "required": ["id", "timestamp", "publishedBy", "summary"]
     }
   },
   "firestore": {
     "/journal_content/{contentId}": {
       "schema": "JournalContent",
       "description": "Journal text content and configuration document"
+    },
+    "/cms_revisions/{revisionId}": {
+      "schema": "CmsRevision",
+      "description": "Historical revision records of published journal CMS content"
     },
     "/journal_assets/{assetId}": {
       "schema": "JournalUploadedAsset",

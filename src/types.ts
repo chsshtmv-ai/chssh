@@ -218,7 +218,7 @@ export interface JournalUploadedAsset {
 
 export interface JournalContent {
   // Index signature for dynamic access
-  [key: string]: string;
+  [key: string]: string | undefined;
   // Masthead & Metadata
   journal_name: string;
   journal_short_name: string;
@@ -435,4 +435,77 @@ export interface JournalContent {
   item_plagiarism_title: string;
   item_plagiarism_desc: string;
   item_plagiarism_badge: string;
+
+  // CMS Homepage Announcements & Banners
+  home_announcement_enabled?: string;
+  home_announcement_badge?: string;
+  home_announcement_title?: string;
+  home_announcement_text?: string;
+  home_announcement_date?: string;
+  home_announcement_link?: string;
+  homepage_banner_url?: string;
+  call_for_papers_banner_url?: string;
+
+  // CMS Section Visibility Toggles
+  show_hero_stats?: string;
+  show_announcements?: string;
+  show_call_for_papers?: string;
+  show_latest_articles?: string;
+  show_indexing_partners?: string;
+
+  // CMS About Journal Manager
+  about_badge?: string;
+  about_title?: string;
+  about_subtitle?: string;
+  about_description?: string;
+  about_history_title?: string;
+  about_history_text?: string;
+  about_objectives_title?: string;
+  about_objectives_text?: string;
+  about_mission_title?: string;
+  about_mission_text?: string;
+  about_policies_title?: string;
+  about_policies_text?: string;
+  about_indexing_summary?: string;
+
+  // CMS Author Guidelines Extra
+  guidelines_referencing_heading?: string;
+  guidelines_referencing_text?: string;
+  guidelines_submission_checklist?: string;
+
+  // CMS Publication Ethics Manager
+  ethics_badge?: string;
+  ethics_title?: string;
+  ethics_subtitle?: string;
+  ethics_plagiarism_heading?: string;
+  ethics_plagiarism_text?: string;
+  ethics_coi_heading?: string;
+  ethics_coi_text?: string;
+  ethics_correction_heading?: string;
+  ethics_correction_text?: string;
+  ethics_retraction_heading?: string;
+  ethics_retraction_text?: string;
+
+  // CMS Contact Page Manager
+  contact_badge?: string;
+  contact_subtitle?: string;
+  contact_instructions?: string;
+  contact_response_time?: string;
+
+  // CMS Header & Footer Manager
+  journal_logo_url?: string;
+  journal_crest_text?: string;
+  footer_description?: string;
+  footer_links_heading?: string;
+  footer_contact_heading?: string;
+  footer_indexing_heading?: string;
+  footer_disclaimer?: string;
+}
+
+export interface CmsRevision {
+  id: string;
+  timestamp: string;
+  publishedBy: string;
+  summary: string;
+  contentSnapshot: JournalContent;
 }
