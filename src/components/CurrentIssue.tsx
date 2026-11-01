@@ -60,14 +60,14 @@ export const CurrentIssue: React.FC = () => {
 
   const publishedArticles = articles.filter((a) => a.status === 'published');
   
-  // Dynamically resolve Current Issue from managed published issues collection
+  // Dynamically resolve Current Issue exclusively from managed published issues collection in Firestore
   const currentIssueRecord =
     issues.find((i) => i.isCurrent && (i.status === 'published' || !i.status)) ||
     issues.find((i) => i.status === 'published');
 
-  const activeVolume = currentIssueRecord ? currentIssueRecord.volumeNumber : (publishedArticles[0]?.volume || 1);
-  const activeIssue = currentIssueRecord ? currentIssueRecord.issueNumber : (publishedArticles[0]?.issue || 1);
-  const activeYear = currentIssueRecord ? currentIssueRecord.year : (publishedArticles[0]?.year || 2026);
+  const activeVolume = currentIssueRecord ? currentIssueRecord.volumeNumber : 1;
+  const activeIssue = currentIssueRecord ? currentIssueRecord.issueNumber : 1;
+  const activeYear = currentIssueRecord ? currentIssueRecord.year : 2026;
 
   // Articles specifically ordered for this issue if configured, else published articles belonging to this volume/issue
   let currentArticles: Article[] = [];
@@ -85,8 +85,6 @@ export const CurrentIssue: React.FC = () => {
       (a) => a.volume === activeVolume && a.issue === activeIssue
     );
     currentArticles = matched;
-  } else if (!currentIssueRecord) {
-    currentArticles = publishedArticles;
   }
 
   const filteredArticles = filterQuery.trim()
@@ -180,6 +178,22 @@ export const CurrentIssue: React.FC = () => {
     }
   };
 
+  if (!currentIssueRecord) {
+    return (
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-xs border border-stone-200/90 dark:border-stone-800 p-12 text-center space-y-4">
+          <BookOpen className="w-12 h-12 mx-auto text-stone-400 dark:text-stone-500" />
+          <h2 className="font-serif text-2xl font-bold text-stone-800 dark:text-stone-200">
+            No current issue has been published yet.
+          </h2>
+          <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 max-w-md mx-auto">
+            When the administrator publishes the current issue through the Admin Panel, it will appear here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       {/* Issue Masthead Banner */}
@@ -205,26 +219,13 @@ export const CurrentIssue: React.FC = () => {
         <div className="flex flex-col md:flex-row items-start justify-between gap-6">
           <div className="space-y-3 max-w-2xl">
             <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-tight">
-              {currentIssueRecord?.title ? (
-                <span>{currentIssueRecord.title}</span>
-              ) : (
-                <EditableText
-                  id="current_issue_title"
-                  placeholder={`Volume ${activeVolume}, Issue ${activeIssue} — Foundational Research`}
-                />
-              )}
+              {currentIssueRecord.title || `Volume ${activeVolume}, Issue ${activeIssue} (${activeYear})`}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-serif leading-relaxed">
-              {currentIssueRecord?.tableOfContentsSummary ? (
-                <span>{currentIssueRecord.tableOfContentsSummary}</span>
-              ) : (
-                <EditableText
-                  id="current_issue_desc"
-                  multiline
-                  placeholder="A curated compendium of peer-reviewed critical interventions examining social sciences, humanities methodologies, and sustainable development."
-                />
-              )}
-            </p>
+            {currentIssueRecord.tableOfContentsSummary && (
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-serif leading-relaxed">
+                {currentIssueRecord.tableOfContentsSummary}
+              </p>
+            )}
           </div>
 
           {/* Issue Cover Artwork / Folio */}

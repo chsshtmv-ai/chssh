@@ -392,6 +392,21 @@ function sanitizeContent(parsed: Partial<JournalContent>): JournalContent {
   ) {
     result.contact_office = "Tamralipta Mahavidyalaya, Abasbari, Tamluk, Purba Medinipur, West Bengal 721636, India";
   }
+  result.show_call_for_papers = "false";
+  if (
+    result.call_for_papers_title && (
+      result.call_for_papers_title.includes("Artificial Intelligence") ||
+      result.call_for_papers_title.includes("Epistemic Justice") ||
+      result.call_for_papers_title.includes("Special Issue")
+    )
+  ) {
+    result.call_for_papers_title = "";
+    result.call_for_papers_desc = "";
+    result.call_for_papers_badge = "";
+    result.call_for_papers_tag = "";
+    result.call_for_papers_deadline = "";
+    result.call_for_papers_cta = "";
+  }
   return result;
 }
 
@@ -616,7 +631,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {
       console.error('Error loading local volumes', e);
     }
-    return initialVolumes;
+    return [];
   });
 
   const [issues, setIssues] = useState<JournalIssue[]>(() => {
@@ -629,7 +644,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {
       console.error('Error loading local issues', e);
     }
-    return initialIssues;
+    return [];
   });
 
   const openAdminAssetUploader = () => {
@@ -1244,12 +1259,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             remoteVolumes.sort((a, b) => b.volumeNumber - a.volumeNumber);
             setVolumes(remoteVolumes);
           } else {
-            setVolumes(initialVolumes);
-            try {
-              for (const vol of initialVolumes) {
-                setDoc(doc(db, 'journal_volumes', vol.id), cleanForFirestore(vol)).catch(() => {});
-              }
-            } catch {}
+            setVolumes([]);
           }
         },
         (error) => {
@@ -1272,12 +1282,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setIssues(remoteIssues);
           } else {
-            setIssues(initialIssues);
-            try {
-              for (const iss of initialIssues) {
-                setDoc(doc(db, 'journal_issues', iss.id), cleanForFirestore(iss)).catch(() => {});
-              }
-            } catch {}
+            setIssues([]);
           }
         },
         (error) => {

@@ -601,15 +601,7 @@ export function generateOfficialCoverPageHtml(content: JournalContent): string {
     <div class="title">${content.journal_name}</div>
     <div class="tagline">${content.journal_tagline}</div>
     <div class="issue-folio">
-      <div class="folio-num">VOLUME 7   ISSUE 1   2026</div>
-      <div class="folio-meta">Special Issue Focus: Critical Inquiry, Epistemic Justice &amp; Algorithmic Culture</div>
-    </div>
-    <div class="features-box">
-      <strong>IN THIS ISSUE:</strong><br>
-        Algorithmic Governance and Epistemic Justice in Public Institutions<br>
-        Deconstructing Technocratic Solipsism in Higher Education Policy<br>
-        Decolonial Methodologies in Digital Archival Hermeneutics<br>
-        The Biopolitics of Environmental Grief in Global Postcolonial Fiction
+      <div class="folio-num">Official Journal Publication Folio</div>
     </div>
   </div>
   <div class="footer">

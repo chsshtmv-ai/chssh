@@ -134,19 +134,6 @@ export const AdminHomepageManager: React.FC = () => {
               placeholder="Submissions are invited for the upcoming issue across all social sciences and humanities disciplines..."
             />
           </div>
-
-          <div className="space-y-1.5 md:col-span-2">
-            <label className="text-xs font-semibold text-stone-700 dark:text-stone-300">
-              Call for Papers Description Box
-            </label>
-            <textarea
-              rows={2}
-              value={draftContent.call_for_papers_text || ''}
-              onChange={(e) => updateDraftContentText('call_for_papers_text', e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-850 text-stone-900 dark:text-stone-100"
-              placeholder="Detailed guidelines and incentives for prospective contributors..."
-            />
-          </div>
         </div>
       </div>
 
@@ -203,8 +190,7 @@ export const AdminHomepageManager: React.FC = () => {
           {[
             { id: 'show_hero_stats', label: 'Journal Metrics & Facts (ISSN, DOI, Frequency)' },
             { id: 'show_announcements', label: 'Top Announcement Banner' },
-            { id: 'show_call_for_papers', label: 'Call for Papers Callout' },
-            { id: 'show_latest_articles', label: 'Latest Published Articles Section' },
+            { id: 'show_latest_articles', label: 'Current Issue Section' },
             { id: 'show_indexing_partners', label: 'Indexing Partners & Archives Grid' }
           ].map((item) => {
             const isVisible = draftContent[item.id as keyof typeof draftContent] !== 'false';

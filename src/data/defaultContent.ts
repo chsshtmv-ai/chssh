@@ -44,15 +44,15 @@ export const initialJournalContent: JournalContent = {
   hero_cta_submit: "Submit Your Manuscript",
   hero_cta_explore: "Browse Current Issue",
   hero_cta_downloads: "Templates & Downloads",
-  call_for_papers_badge: "Call for Papers   Vol. 7, No. 3",
-  call_for_papers_tag: "Special Thematic Issue",
-  call_for_papers_title: "Special Issue: Artificial Intelligence, Epistemic Justice, and the Human Condition",
-  call_for_papers_desc: "We invite original empirical research, theoretical interventions, and critical book reviews examining how algorithmic culture reframes societal institutions, historical narrative, and moral philosophy.",
-  call_for_papers_deadline: "Submission Deadline: November 30, 2026",
-  call_for_papers_cta: "Submit to Special Issue",
-  home_latest_badge: "Latest Scholarly Publications",
-  home_latest_title: "Current Issue   Vol. 7, No. 1 (2026)",
-  home_latest_view_all: "View All Papers in Volume 7",
+  call_for_papers_badge: "",
+  call_for_papers_tag: "",
+  call_for_papers_title: "",
+  call_for_papers_desc: "",
+  call_for_papers_deadline: "",
+  call_for_papers_cta: "",
+  home_latest_badge: "Current Issue",
+  home_latest_title: "Current Issue",
+  home_latest_view_all: "View Full Current Issue",
   home_filter_label: "Filter by Discipline:",
 
   // Impact & Stats
@@ -251,7 +251,7 @@ export const initialJournalContent: JournalContent = {
   // CMS Section Visibility Toggles
   show_hero_stats: "true",
   show_announcements: "true",
-  show_call_for_papers: "true",
+  show_call_for_papers: "false",
   show_latest_articles: "true",
   show_indexing_partners: "true",
 

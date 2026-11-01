@@ -19,6 +19,7 @@ import {
 export const HomeHero: React.FC = () => {
   const {
     articles,
+    issues,
     setActiveTab,
     setSelectedArticleForView,
     downloadPublishedPaper,
@@ -39,7 +40,31 @@ export const HomeHero: React.FC = () => {
     (typeof window !== 'undefined' && localStorage.getItem(`chssh_pub_file_${art.id}`))
   );
 
-  const publishedArticles = articles.filter((a) => a.status === 'published');
+  // Dynamically resolve Current Issue exclusively from managed published issues in Firestore
+  const currentIssueRecord =
+    issues.find((i) => i.isCurrent && (i.status === 'published' || !i.status)) ||
+    issues.find((i) => i.status === 'published');
+
+  let currentIssueArticles: typeof articles = [];
+  if (currentIssueRecord) {
+    if (currentIssueRecord.articleIds && currentIssueRecord.articleIds.length > 0) {
+      const ordered = currentIssueRecord.articleIds
+        .map((id) => articles.find((a) => a.id === id))
+        .filter((a): a is typeof articles[0] => !!a && a.status === 'published');
+      if (ordered.length > 0) {
+        currentIssueArticles = ordered;
+      }
+    }
+    if (currentIssueArticles.length === 0) {
+      currentIssueArticles = articles.filter(
+        (a) =>
+          a.status === 'published' &&
+          a.volume === currentIssueRecord.volumeNumber &&
+          a.issue === currentIssueRecord.issueNumber
+      );
+    }
+  }
+
   const tracks = [
     { id: 'all', label: 'All Disciplines' },
     { id: 'Sociology & Social Theory', label: 'Sociology' },
@@ -50,8 +75,8 @@ export const HomeHero: React.FC = () => {
   ];
 
   const filteredArticles = selectedTrack === 'all'
-    ? publishedArticles
-    : publishedArticles.filter(a => a.track.toLowerCase().includes(selectedTrack.toLowerCase()) || a.track === selectedTrack);
+    ? currentIssueArticles
+    : currentIssueArticles.filter(a => a.track.toLowerCase().includes(selectedTrack.toLowerCase()) || a.track === selectedTrack);
 
   const displayedArticles = filteredArticles.slice(0, 4);
 
@@ -259,119 +284,86 @@ export const HomeHero: React.FC = () => {
         )}
       </section>
 
-      {/* Special Call for Papers Banner */}
-      {currentContent.show_call_for_papers !== 'false' && (
-      <section aria-labelledby="call-for-papers-heading" className="max-w-6xl mx-auto px-4">
-        <motion.div
-          whileHover={{ scale: 1.005 }}
-          className="relative bg-gradient-to-br from-[#0a162b] via-[#102344] to-[#1c355e] text-white rounded-2xl p-6 sm:p-8 shadow-lg border border-sky-400/30 overflow-hidden"
-        >
-          <div className="absolute -right-20 -top-20 w-64 h-64 bg-sky-400/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="space-y-2.5 max-w-3xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-sky-400/20 text-sky-200 border border-sky-300/40 text-xs font-bold uppercase tracking-wider">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping" />
-                  <EditableText id="call_for_papers_badge" placeholder="Call for Papers   Vol. 7, No. 3" />
-                </span>
-                <span className="text-xs text-slate-300 font-mono">
-                  <EditableText id="call_for_papers_tag" placeholder="Special Thematic Issue" />
-                </span>
-              </div>
-              <h2 id="call-for-papers-heading" className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-white tracking-tight leading-snug">
-                <EditableText
-                  id="call_for_papers_title"
-                  placeholder="Special Issue: Artificial Intelligence, Epistemic Justice, and the Human Condition"
-                />
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-200 font-serif leading-relaxed">
-                <EditableText
-                  id="call_for_papers_desc"
-                  multiline
-                  placeholder="We invite original empirical research, theoretical interventions, and critical book reviews examining how algorithmic culture reframes societal institutions, historical narrative, and moral philosophy."
-                />
-              </p>
-              <div className="flex items-center gap-2 text-xs text-sky-200/90 font-mono pt-1">
-                <Calendar className="w-3.5 h-3.5 text-sky-300" />
-                <EditableText id="call_for_papers_deadline" placeholder="Submission Deadline: November 30, 2026" />
-              </div>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              type="button"
-              onClick={() => setActiveTab('submit')}
-              className="shrink-0 group flex items-center gap-2 px-5 py-3 bg-white hover:bg-slate-100 text-[#102344] rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md"
-            >
-              <span>
-                <EditableText id="call_for_papers_cta" placeholder="Submit to Special Issue" />
-              </span>
-              <ArrowRight className="w-4 h-4 text-[#1c355e] group-hover:translate-x-1 transition-transform" />
-            </motion.button>
-          </div>
-        </motion.div>
-      </section>
-      )}
-
-      {/* Featured Research Articles */}
-      <section className="max-w-6xl mx-auto px-4 space-y-6">
+      {/* Current Issue Section */}
+      <section aria-labelledby="home-current-issue-heading" className="max-w-6xl mx-auto px-4 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
           <div>
             <div className="text-xs font-semibold text-[#1c355e] dark:text-sky-400 uppercase tracking-widest flex items-center gap-1.5">
               <Award className="w-3.5 h-3.5" />
-              <span>
-                <EditableText id="home_latest_badge" placeholder="Latest Scholarly Publications" />
-              </span>
+              <span>Current Issue</span>
             </div>
-            <h2 className="font-serif text-2xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">
-              <EditableText id="home_latest_title" placeholder="Current Issue   Vol. 7, No. 1 (2026)" />
+            <h2 id="home-current-issue-heading" className="font-serif text-2xl font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+              {currentIssueRecord?.title ? (
+                <span>{currentIssueRecord.title}</span>
+              ) : currentIssueRecord ? (
+                <span>{`Volume ${currentIssueRecord.volumeNumber}, Issue ${currentIssueRecord.issueNumber} (${currentIssueRecord.year})`}</span>
+              ) : (
+                <span>Current Issue</span>
+              )}
             </h2>
+            {currentIssueRecord?.tableOfContentsSummary && (
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 font-serif mt-1 max-w-2xl">
+                {currentIssueRecord.tableOfContentsSummary}
+              </p>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => setActiveTab('current')}
-            className="text-xs font-bold text-[#1c355e] dark:text-sky-400 hover:text-[#102344] dark:hover:text-sky-300 flex items-center gap-1 cursor-pointer group"
-          >
-            <span>
-              <EditableText id="home_latest_view_all" placeholder="View All Papers in Volume 7" />
-            </span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
-
-        {/* Disciplinary Track Filter */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-          <span className="text-slate-500 dark:text-slate-400 font-medium text-xs mr-1 hidden sm:inline">
-            <EditableText id="home_filter_label" placeholder="Filter:" />
-          </span>
-          {tracks.map((t) => (
+          {currentIssueRecord && (
             <button
-              key={t.id}
               type="button"
-              onClick={() => setSelectedTrack(t.id)}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer whitespace-nowrap ${
-                selectedTrack === t.id
-                  ? 'bg-[#1c355e] dark:bg-[#23467d] text-white shadow-2xs font-semibold'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
+              onClick={() => setActiveTab('current')}
+              className="text-xs font-bold text-[#1c355e] dark:text-sky-400 hover:text-[#102344] dark:hover:text-sky-300 flex items-center gap-1 cursor-pointer group"
             >
-              {t.label}
+              <span>View Full Current Issue</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
             </button>
-          ))}
+          )}
         </div>
 
-        {/* Articles List */}
-        {publishedArticles.length === 0 ? (
+        {!currentIssueRecord ? (
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 p-12 text-center space-y-3">
             <BookOpen className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500" />
             <h3 className="font-serif text-lg font-bold text-slate-800 dark:text-slate-200">
-              No papers have been published yet.
+              No current issue has been published yet.
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-              Peer-reviewed manuscripts approved by the editorial office will appear here upon publication.
+              When the administrator publishes the current issue through the Admin Panel, it will appear here.
             </p>
           </div>
         ) : (
+          <>
+            {/* Disciplinary Track Filter */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              <span className="text-slate-500 dark:text-slate-400 font-medium text-xs mr-1 hidden sm:inline">
+                <EditableText id="home_filter_label" placeholder="Filter:" />
+              </span>
+              {tracks.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setSelectedTrack(t.id)}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer whitespace-nowrap ${
+                    selectedTrack === t.id
+                      ? 'bg-[#1c355e] dark:bg-[#23467d] text-white shadow-2xs font-semibold'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Articles List */}
+            {currentIssueArticles.length === 0 ? (
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 p-12 text-center space-y-3">
+                <BookOpen className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500" />
+                <h3 className="font-serif text-lg font-bold text-slate-800 dark:text-slate-200">
+                  No papers have been published in this issue yet.
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+                  Peer-reviewed manuscripts approved by the editorial office will appear here upon publication.
+                </p>
+              </div>
+            ) : (
           <div className="space-y-4">
             {displayedArticles.map((article, idx) => (
               <motion.article
@@ -496,6 +488,8 @@ export const HomeHero: React.FC = () => {
               </motion.article>
             ))}
           </div>
+        )}
+        </>
         )}
       </section>
 
