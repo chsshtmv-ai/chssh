@@ -194,7 +194,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenAdminLogin }) => {
                   <EditableText
                     id="contact_office"
                     multiline
-                    placeholder="Chrystal Macmillan Building, George Square, Edinburgh EH8 9LD, United Kingdom"
+                    placeholder="Tamralipta Mahavidyalaya, Abasbari, Tamluk, Purba Medinipur, West Bengal 721636, India"
                   />
                 </span>
               </div>

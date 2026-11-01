@@ -207,7 +207,7 @@ export const AdminEditorialBoard: React.FC<AdminEditorialBoardProps> = ({
                 required
                 value={newMember.affiliation}
                 onChange={(e) => setNewMember({ ...newMember, affiliation: e.target.value })}
-                placeholder="e.g. University of Edinburgh"
+                placeholder="e.g. Tamralipta Mahavidyalaya, Vidyasagar University"
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg outline-none focus:ring-2 focus:ring-[#1c355e]"
               />
             </div>

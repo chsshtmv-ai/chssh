@@ -230,10 +230,13 @@ export interface JournalContent {
   publisher: string;
   editor_in_chief_name: string;
   editor_in_chief_title: string;
+  editor_in_chief_affiliation?: string;
   editor_in_chief_badge: string;
   editor_in_chief_tenure: string;
   editor_in_chief_quote: string;
   // Header & Navigation
+  top_announcement_bar_text?: string;
+  header_top_announcement?: string;
   header_badge: string;
   header_established: string;
   header_access_badge: string;

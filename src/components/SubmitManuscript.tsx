@@ -542,7 +542,7 @@ export const SubmitManuscript: React.FC = () => {
                       type="text"
                       value={author.affiliation}
                       onChange={(e) => updateAuthorField(author.id, 'affiliation', e.target.value)}
-                      placeholder="e.g. Department of Sociology, University of Edinburgh"
+                      placeholder="e.g. Department of Sociology, Tamralipta Mahavidyalaya"
                       className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
                     />
                   </div>

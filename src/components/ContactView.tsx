@@ -108,7 +108,7 @@ export const ContactView: React.FC = () => {
               <div>
                 <span className="font-semibold text-stone-500 uppercase text-[10px]">Postal & Editorial Office:</span>
                 <div className="font-medium text-stone-800 dark:text-stone-200 text-xs mt-0.5 leading-relaxed font-serif">
-                  <EditableText id="contact_office" multiline placeholder="Chrystal Macmillan Building, George Square, Edinburgh EH8 9LD, United Kingdom" />
+                  <EditableText id="contact_office" multiline placeholder="Tamralipta Mahavidyalaya, Abasbari, Tamluk, Purba Medinipur, West Bengal 721636, India" />
                 </div>
               </div>
             </div>

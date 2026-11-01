@@ -334,6 +334,10 @@ export const KEY_ALIASES: Record<string, string[]> = {
   editor_in_chief_tenure: ['eic_tenure_badge'],
   editor_in_chief_statement: ['editor_in_chief_quote'],
   editor_in_chief_quote: ['editor_in_chief_statement'],
+  editor_in_chief_title: ['editor_in_chief_affiliation'],
+  editor_in_chief_affiliation: ['editor_in_chief_title'],
+  top_announcement_bar_text: ['header_top_announcement'],
+  header_top_announcement: ['top_announcement_bar_text'],
   nav_current: ['nav_current_issue'],
   nav_current_issue: ['nav_current'],
   nav_aims: ['nav_aims_scope'],
@@ -345,6 +349,51 @@ export const KEY_ALIASES: Record<string, string[]> = {
   nav_track: ['nav_track_submission'],
   nav_track_submission: ['nav_track']
 };
+
+function sanitizeContent(parsed: Partial<JournalContent>): JournalContent {
+  const result: JournalContent = { ...initialJournalContent, ...parsed };
+  if (
+    !result.editor_in_chief_title ||
+    result.editor_in_chief_title.includes("Edinburgh") ||
+    result.editor_in_chief_title.includes("Chair of Social Policy")
+  ) {
+    result.editor_in_chief_title = "Assistant Professor, Tamralipta Mahavidyalaya, Vidyasagar University";
+  }
+  if (
+    !result.editor_in_chief_affiliation ||
+    result.editor_in_chief_affiliation.includes("Edinburgh") ||
+    result.editor_in_chief_affiliation.includes("Chair of Social Policy")
+  ) {
+    result.editor_in_chief_affiliation = "Tamralipta Mahavidyalaya, Vidyasagar University";
+  }
+  if (
+    !result.editor_in_chief_name ||
+    result.editor_in_chief_name.includes("Elizabeth Vance")
+  ) {
+    result.editor_in_chief_name = "Dr. Ajay Babu";
+  }
+  if (
+    !result.top_announcement_bar_text ||
+    result.top_announcement_bar_text.includes("Edinburgh") ||
+    result.top_announcement_bar_text.includes("Chair of Social Policy")
+  ) {
+    result.top_announcement_bar_text = "Contemporary Horizons in Social Sciences and Humanities (CHSSH)";
+  }
+  if (
+    !result.header_top_announcement ||
+    result.header_top_announcement.includes("Edinburgh") ||
+    result.header_top_announcement.includes("Chair of Social Policy")
+  ) {
+    result.header_top_announcement = "Contemporary Horizons in Social Sciences and Humanities (CHSSH)";
+  }
+  if (
+    !result.contact_office ||
+    result.contact_office.includes("Edinburgh")
+  ) {
+    result.contact_office = "Tamralipta Mahavidyalaya, Abasbari, Tamluk, Purba Medinipur, West Bengal 721636, India";
+  }
+  return result;
+}
 
 function broadcastSync(type: string, data: any) {
   try {
@@ -366,7 +415,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const saved = localStorage.getItem('chssh_journal_content');
       if (saved) {
-        return { ...initialJournalContent, ...JSON.parse(saved) };
+        return sanitizeContent(JSON.parse(saved));
       }
     } catch (e) {
       console.error('Error loading local journal content', e);
@@ -378,11 +427,11 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const saved = localStorage.getItem('chssh_cms_draft_content');
       if (saved) {
-        return { ...initialJournalContent, ...JSON.parse(saved) };
+        return sanitizeContent(JSON.parse(saved));
       }
       const savedMain = localStorage.getItem('chssh_journal_content');
       if (savedMain) {
-        return { ...initialJournalContent, ...JSON.parse(savedMain) };
+        return sanitizeContent(JSON.parse(savedMain));
       }
     } catch (e) {
       console.error('Error loading local CMS draft', e);
@@ -809,7 +858,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const { type, data } = event.data || {};
           if (!type || !data) return;
           if (type === 'SYNC_CONTENT') {
-            setContent(prev => ({ ...prev, ...data }));
+            setContent(prev => sanitizeContent({ ...prev, ...data }));
           } else if (type === 'SYNC_ARTICLES') {
             setArticles(data);
           } else if (type === 'SYNC_EDITORIAL') {
@@ -841,7 +890,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!e.newValue) return;
       try {
         if (e.key === 'chssh_journal_content') {
-          setContent(prev => ({ ...prev, ...JSON.parse(e.newValue!) }));
+          setContent(prev => sanitizeContent({ ...prev, ...JSON.parse(e.newValue!) }));
         } else if (e.key === 'chssh_articles') {
           setArticles(JSON.parse(e.newValue!));
         } else if (e.key === 'chssh_editorial_board') {
@@ -906,7 +955,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
               return;
             }
             const data = snap.data() as JournalContent;
-            setContent(prev => ({ ...prev, ...data }));
+            setContent(prev => sanitizeContent({ ...prev, ...data }));
             setFirebaseStatus('connected');
             setLastSyncedAt(new Date());
           } else if (!isContentSeeded.current) {
@@ -1592,7 +1641,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       unsubDraft = onSnapshot(draftDocRef, (snap) => {
         if (snap.exists()) {
           const draftData = snap.data() as JournalContent;
-          setDraftContent(prev => ({ ...initialJournalContent, ...draftData }));
+          setDraftContent(prev => sanitizeContent({ ...initialJournalContent, ...draftData }));
           if (draftData.updatedAt) {
             setLastDraftSavedAt(draftData.updatedAt);
           }

@@ -88,6 +88,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenAdminLogin }) => {
 
   return (
     <header className="bg-white dark:bg-[#0f1115] border-b border-stone-200/90 dark:border-stone-800 transition-colors duration-200">
+      {/* ========================================================================= */}
+      {/* TOP MAROON ANNOUNCEMENT STRIP (Row 0)                                      */}
+      {/* ========================================================================= */}
+      <div className="bg-[#5c1626] dark:bg-[#340913] text-[#fdf5f0] border-b border-[#420f1b] dark:border-[#26060e] text-xs sm:text-[13px] font-serif py-1.5 px-4 sm:px-6 lg:px-8 text-center tracking-wide transition-colors">
+        <div className="max-w-7xl mx-auto flex items-center justify-center">
+          <EditableText
+            id="top_announcement_bar_text"
+            placeholder="Contemporary Horizons in Social Sciences and Humanities (CHSSH)"
+          />
+        </div>
+      </div>
+
       {/* Sticky Container for the Two Top Bars: Navigation Bar & Utility Bar */}
       <div className="sticky top-0 z-30 shadow-xs backdrop-blur-md">
         {/* ========================================================================= */}

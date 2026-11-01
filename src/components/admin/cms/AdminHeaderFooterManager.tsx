@@ -1,12 +1,45 @@
 import React from 'react';
 import { useJournal } from '../../../context/JournalContext';
-import { Layout, Menu, Image as ImageIcon, Shield, Compass } from 'lucide-react';
+import { Layout, Menu, Image as ImageIcon, Shield, Compass, Megaphone } from 'lucide-react';
 
 export const AdminHeaderFooterManager: React.FC = () => {
   const { draftContent, updateDraftContentText } = useJournal();
 
   return (
     <div className="space-y-6">
+      {/* 0. Top Announcement Bar (Maroon Header Strip) */}
+      <div className="bg-white dark:bg-stone-900 rounded-xl p-5 border border-stone-200 dark:border-stone-800 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-stone-900 dark:text-stone-100 font-serif font-bold text-base">
+            <Megaphone className="w-5 h-5 text-[#5c1626] dark:text-[#c27d56]" />
+            <h3>Top Announcement Bar (Maroon Header Strip)</h3>
+          </div>
+          <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-950/80 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800 font-semibold">
+            Top Header Strip
+          </span>
+        </div>
+        <p className="text-xs text-stone-500 dark:text-stone-400">
+          Customize the text displayed in the narrow maroon header strip at the very top of the website.
+        </p>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-stone-700 dark:text-stone-300 flex items-center justify-between">
+            <span>Top Announcement Bar Text</span>
+            <span className="text-[10px] text-stone-400 font-mono">top_announcement_bar_text</span>
+          </label>
+          <input
+            type="text"
+            value={draftContent.top_announcement_bar_text !== undefined ? draftContent.top_announcement_bar_text : 'Contemporary Horizons in Social Sciences and Humanities (CHSSH)'}
+            onChange={(e) => updateDraftContentText('top_announcement_bar_text', e.target.value)}
+            className="w-full px-3 py-2 text-xs font-serif font-medium rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-850 text-slate-900 dark:text-slate-100"
+            placeholder="Contemporary Horizons in Social Sciences and Humanities (CHSSH)"
+          />
+          <p className="text-[11px] text-stone-500 font-serif">
+            Default: &ldquo;Contemporary Horizons in Social Sciences and Humanities (CHSSH)&rdquo;. Saved in Firestore CMS and published live upon clicking &ldquo;Publish Changes&rdquo;.
+          </p>
+        </div>
+      </div>
+
       {/* 1. Header Branding & Logo */}
       <div className="bg-white dark:bg-stone-900 rounded-xl p-5 border border-stone-200 dark:border-stone-800 shadow-xs space-y-4">
         <div className="flex items-center gap-2 text-stone-900 dark:text-stone-100 font-serif font-bold text-base">

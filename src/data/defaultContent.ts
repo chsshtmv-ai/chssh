@@ -10,13 +10,16 @@ export const initialJournalContent: JournalContent = {
   doi_prefix: "10.5281/chssh",
   frequency: "Quarterly (4 issues per annum)",
   publisher: "Horizon Scholarly Academic Press",
-  editor_in_chief_name: "Prof. Dr. Elizabeth Vance, Ph.D.",
-  editor_in_chief_title: "Chair of Social Policy & Humanistic Inquiry, University of Edinburgh",
+  editor_in_chief_name: "Dr. Ajay Babu",
+  editor_in_chief_title: "Assistant Professor, Tamralipta Mahavidyalaya, Vidyasagar University",
+  editor_in_chief_affiliation: "Tamralipta Mahavidyalaya, Vidyasagar University",
   editor_in_chief_badge: "Editor-in-Chief",
   editor_in_chief_tenure: "Tenured Chair",
   editor_in_chief_quote: "Our mission at Contemporary Horizons is to cultivate critical scholarship that speaks with theoretical bravery and methodological discipline to the existential questions confronting contemporary societies. We are dedicated to transparent, constructive peer review that uplifts scholars across all geographical and epistemic traditions.",
 
   // Header & Navigation
+  top_announcement_bar_text: "Contemporary Horizons in Social Sciences and Humanities (CHSSH)",
+  header_top_announcement: "Contemporary Horizons in Social Sciences and Humanities (CHSSH)",
   header_badge: "International Scholarly Journal",
   header_established: "Established 2019",
   header_access_badge: "Gold Open Access (CC BY 4.0)",
@@ -199,9 +202,9 @@ export const initialJournalContent: JournalContent = {
   // Contact & Office
   contact_title: "Editorial Secretariat & Inquiries",
   contact_email: "editorial@contemporaryhorizons.org",
-  contact_phone: "+44 (0) 131 650 1000",
-  contact_office: "Chrystal Macmillan Building, George Square, Edinburgh EH8 9LD, United Kingdom",
-  contact_hours: "Monday   Friday: 09:00   17:00 GMT",
+  contact_phone: "+91-9708669600",
+  contact_office: "Tamralipta Mahavidyalaya, Abasbari, Tamluk, Purba Medinipur, West Bengal 721636, India",
+  contact_hours: "Monday – Friday: 09:00 – 17:00 IST",
   footer_copyright: "  2026 Contemporary Horizons in Social Sciences and Humanities. Published under Creative Commons Attribution 4.0 International License (CC BY 4.0).",
   footer_ethics_note: "Member of the Committee on Publication Ethics (COPE). Committed to diversity, equity, and ethical academic publishing.",
 

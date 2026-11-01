@@ -83,10 +83,14 @@ export const EditorialBoardView: React.FC = () => {
           )}
           <div className="space-y-1">
             <h3 className="font-serif text-2xl sm:text-3xl font-bold text-white">
-              <EditableText id="editor_in_chief_name" placeholder="Prof. Dr. Elizabeth Vance, Ph.D." />
+              <EditableText id="editor_in_chief_name" placeholder="Dr. Ajay Babu" />
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 font-serif">
-              <EditableText id="editor_in_chief_title" placeholder="Chair of Social Policy & Humanistic Inquiry, University of Edinburgh" />
+              <EditableText
+                id="editor_in_chief_title"
+                className="text-slate-200 font-medium"
+                placeholder="Assistant Professor, Tamralipta Mahavidyalaya, Vidyasagar University"
+              />
             </p>
           </div>
         </div>

@@ -18,6 +18,10 @@ const KEY_ALIASES: Record<string, string[]> = {
   editor_in_chief_tenure: ['eic_tenure_badge'],
   editor_in_chief_statement: ['editor_in_chief_quote'],
   editor_in_chief_quote: ['editor_in_chief_statement'],
+  editor_in_chief_title: ['editor_in_chief_affiliation'],
+  editor_in_chief_affiliation: ['editor_in_chief_title'],
+  top_announcement_bar_text: ['header_top_announcement'],
+  header_top_announcement: ['top_announcement_bar_text'],
   nav_current: ['nav_current_issue'],
   nav_current_issue: ['nav_current'],
   nav_aims: ['nav_aims_scope'],
@@ -50,7 +54,20 @@ export const EditableText: React.FC<EditableTextProps> = ({
     }
   }
 
-  const value = (rawValue !== undefined && rawValue !== null && rawValue !== '') ? rawValue : placeholder;
+  let value = (rawValue !== undefined && rawValue !== null && rawValue !== '') ? rawValue : placeholder;
+
+  if (typeof value === 'string' && (value.includes('Edinburgh') || value.includes('Chair of Social Policy & Humanistic Inquiry') || value.includes('Chair of Social Policy'))) {
+    if (id === 'editor_in_chief_title' || id === 'editor_in_chief_affiliation') {
+      value = 'Assistant Professor, Tamralipta Mahavidyalaya, Vidyasagar University';
+    } else if (id === 'top_announcement_bar_text' || id === 'header_top_announcement') {
+      value = 'Contemporary Horizons in Social Sciences and Humanities (CHSSH)';
+    } else if (id === 'contact_office') {
+      value = 'Tamralipta Mahavidyalaya, Abasbari, Tamluk, Purba Medinipur, West Bengal 721636, India';
+    } else {
+      value = placeholder || '';
+    }
+  }
+
   const Tag = tag as any;
 
   return <Tag className={className}>{value}</Tag>;
