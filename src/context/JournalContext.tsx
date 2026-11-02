@@ -1001,7 +1001,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const remoteArticles: Article[] = [];
             snap.forEach((docItem) => {
               const art = docItem.data() as Article;
-              remoteArticles.push(art);
+              remoteArticles.push({ ...art, id: docItem.id || art.id });
             });
             remoteArticles.sort((a, b) => {
               const dateA = new Date(a.submissionDate || a.publishedDate || '').getTime() || 0;

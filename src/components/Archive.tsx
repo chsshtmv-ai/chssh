@@ -160,15 +160,25 @@ export const Archive: React.FC = () => {
         }> = [];
 
         issuesList.forEach(iss => {
-          // Resolve articles in this issue (only explicitly published articles)
-          let matchedArticles = iss.articleIds
-            .map(id => articles.find(a => a.id === id))
-            .filter((a): a is Article => !!a && a.status === 'published');
-
-          if (matchedArticles.length === 0) {
-            matchedArticles = publishedArticles.filter(
-              a => a.volume === iss.volumeNumber && a.issue === iss.issueNumber
-            );
+          // Resolve articles in this issue (merging explicitly ordered IDs with all matching published volume/issue articles)
+          const seen = new Set<string>();
+          let matchedArticles: Article[] = [];
+          if (iss.articleIds && iss.articleIds.length > 0) {
+            for (const id of iss.articleIds) {
+              const found = publishedArticles.find(a => a.id === id);
+              if (found && !seen.has(found.id)) {
+                seen.add(found.id);
+                matchedArticles.push(found);
+              }
+            }
+          }
+          for (const art of publishedArticles) {
+            const artVol = typeof art.volume === 'number' ? art.volume : Number(art.volume) || 1;
+            const artIss = typeof art.issue === 'number' ? art.issue : Number(art.issue) || 1;
+            if (!seen.has(art.id) && artVol === iss.volumeNumber && artIss === iss.issueNumber) {
+              seen.add(art.id);
+              matchedArticles.push(art);
+            }
           }
 
           // Apply track filter

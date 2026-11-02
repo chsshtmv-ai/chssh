@@ -40,45 +40,96 @@ export const HomeHero: React.FC = () => {
     (typeof window !== 'undefined' && localStorage.getItem(`chssh_pub_file_${art.id}`))
   );
 
+  // Published articles filter (strictly status === 'published' or isPublishedLive === true)
+  const publishedArticles = React.useMemo(() => {
+    return articles.filter((a) => a.status === 'published' || (a as any).isPublishedLive === true);
+  }, [articles]);
+
   // Dynamically resolve Current Issue exclusively from managed published issues in Firestore
   const currentIssueRecord =
     issues.find((i) => i.isCurrent && (i.status === 'published' || !i.status)) ||
     issues.find((i) => i.status === 'published');
 
-  let currentIssueArticles: typeof articles = [];
-  if (currentIssueRecord) {
-    if (currentIssueRecord.articleIds && currentIssueRecord.articleIds.length > 0) {
-      const ordered = currentIssueRecord.articleIds
-        .map((id) => articles.find((a) => a.id === id))
-        .filter((a): a is typeof articles[0] => !!a && a.status === 'published');
-      if (ordered.length > 0) {
-        currentIssueArticles = ordered;
+  // Resolve current issue articles:
+  // 1. Prioritize any explicitly ordered articleIds for this issue
+  // 2. Append any published articles matching volumeNumber & issueNumber
+  // 3. Fallback to any remaining published articles so all published papers are displayed
+  const currentIssueArticles = React.useMemo(() => {
+    if (publishedArticles.length === 0) return [];
+    const seen = new Set<string>();
+    const list: typeof articles = [];
+
+    // 1. Articles explicitly listed in the issue's articleIds
+    if (currentIssueRecord?.articleIds && currentIssueRecord.articleIds.length > 0) {
+      for (const id of currentIssueRecord.articleIds) {
+        const found = publishedArticles.find((a) => a.id === id);
+        if (found && !seen.has(found.id)) {
+          seen.add(found.id);
+          list.push(found);
+        }
       }
     }
-    if (currentIssueArticles.length === 0) {
-      currentIssueArticles = articles.filter(
-        (a) =>
-          a.status === 'published' &&
-          a.volume === currentIssueRecord.volumeNumber &&
-          a.issue === currentIssueRecord.issueNumber
-      );
-    }
-  }
 
-  const tracks = [
-    { id: 'all', label: 'All Disciplines' },
-    { id: 'Sociology & Social Theory', label: 'Sociology' },
-    { id: 'Cultural Studies & Critical Theory', label: 'Critical Theory' },
-    { id: 'Applied Ethics & Epistemic Justice', label: 'Ethics & Justice' },
-    { id: 'Digital Humanities & Computational Social Science', label: 'Digital Humanities' },
-    { id: 'History, Memory & Archival Studies', label: 'History & Memory' }
-  ];
+    // 2. Published articles matching this issue's volume & issue number
+    if (currentIssueRecord) {
+      for (const art of publishedArticles) {
+        if (!seen.has(art.id)) {
+          const artVol = typeof art.volume === 'number' ? art.volume : Number(art.volume) || 1;
+          const artIss = typeof art.issue === 'number' ? art.issue : Number(art.issue) || 1;
+          if (artVol === currentIssueRecord.volumeNumber && artIss === currentIssueRecord.issueNumber) {
+            seen.add(art.id);
+            list.push(art);
+          }
+        }
+      }
+    }
+
+    // 3. Any other published papers (e.g. if published live directly by administrator)
+    for (const art of publishedArticles) {
+      if (!seen.has(art.id)) {
+        seen.add(art.id);
+        list.push(art);
+      }
+    }
+
+    return list;
+  }, [publishedArticles, currentIssueRecord]);
+
+  const tracks = React.useMemo(() => {
+    const defaultTracks = [
+      { id: 'all', label: 'All Disciplines' },
+      { id: 'Sociology & Social Theory', label: 'Sociology' },
+      { id: 'Cultural Studies & Critical Theory', label: 'Critical Theory' },
+      { id: 'Applied Ethics & Epistemic Justice', label: 'Ethics & Justice' },
+      { id: 'Digital Humanities & AI Ethics', label: 'Digital Humanities' },
+      { id: 'History, Memory & Archival Studies', label: 'History & Memory' }
+    ];
+
+    const extraTracks: { id: string; label: string }[] = [];
+    currentIssueArticles.forEach((art) => {
+      if (art.track && art.track.trim()) {
+        const exists = defaultTracks.some(
+          (t) => t.id.toLowerCase() === art.track.toLowerCase() || art.track.toLowerCase().includes(t.id.toLowerCase())
+        );
+        if (!exists && !extraTracks.some((t) => t.id === art.track)) {
+          extraTracks.push({ id: art.track, label: art.track });
+        }
+      }
+    });
+
+    return [...defaultTracks, ...extraTracks];
+  }, [currentIssueArticles]);
 
   const filteredArticles = selectedTrack === 'all'
     ? currentIssueArticles
-    : currentIssueArticles.filter(a => a.track.toLowerCase().includes(selectedTrack.toLowerCase()) || a.track === selectedTrack);
+    : currentIssueArticles.filter((a) => {
+        if (!a.track) return false;
+        const trackLow = a.track.toLowerCase();
+        const selLow = selectedTrack.toLowerCase();
+        return trackLow.includes(selLow) || selLow.includes(trackLow);
+      });
 
-  const displayedArticles = filteredArticles.slice(0, 4);
+  const displayedArticles = filteredArticles;
 
   return (
     <div className="space-y-12">
@@ -297,6 +348,8 @@ export const HomeHero: React.FC = () => {
                 <span>{currentIssueRecord.title}</span>
               ) : currentIssueRecord ? (
                 <span>{`Volume ${currentIssueRecord.volumeNumber}, Issue ${currentIssueRecord.issueNumber} (${currentIssueRecord.year})`}</span>
+              ) : currentIssueArticles.length > 0 ? (
+                <span>{`Volume ${currentIssueArticles[0].volume || 1}, Issue ${currentIssueArticles[0].issue || 1} (${currentIssueArticles[0].year || 2026})`}</span>
               ) : (
                 <span>Current Issue</span>
               )}
@@ -307,7 +360,7 @@ export const HomeHero: React.FC = () => {
               </p>
             )}
           </div>
-          {currentIssueRecord && (
+          {(currentIssueRecord || currentIssueArticles.length > 0) && (
             <button
               type="button"
               onClick={() => setActiveTab('current')}
@@ -319,7 +372,7 @@ export const HomeHero: React.FC = () => {
           )}
         </div>
 
-        {!currentIssueRecord ? (
+        {!currentIssueRecord && currentIssueArticles.length === 0 ? (
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/90 dark:border-slate-800 p-12 text-center space-y-3">
             <BookOpen className="w-10 h-10 mx-auto text-slate-400 dark:text-slate-500" />
             <h3 className="font-serif text-lg font-bold text-slate-800 dark:text-slate-200">

@@ -58,34 +58,61 @@ export const CurrentIssue: React.FC = () => {
     });
   }, []);
 
-  const publishedArticles = articles.filter((a) => a.status === 'published');
+  const publishedArticles = React.useMemo(() => {
+    return articles.filter((a) => a.status === 'published' || (a as any).isPublishedLive === true);
+  }, [articles]);
   
   // Dynamically resolve Current Issue exclusively from managed published issues collection in Firestore
   const currentIssueRecord =
     issues.find((i) => i.isCurrent && (i.status === 'published' || !i.status)) ||
     issues.find((i) => i.status === 'published');
 
-  const activeVolume = currentIssueRecord ? currentIssueRecord.volumeNumber : 1;
-  const activeIssue = currentIssueRecord ? currentIssueRecord.issueNumber : 1;
-  const activeYear = currentIssueRecord ? currentIssueRecord.year : 2026;
+  const activeVolume = currentIssueRecord ? currentIssueRecord.volumeNumber : (publishedArticles[0]?.volume || 1);
+  const activeIssue = currentIssueRecord ? currentIssueRecord.issueNumber : (publishedArticles[0]?.issue || 1);
+  const activeYear = currentIssueRecord ? currentIssueRecord.year : (publishedArticles[0]?.year || 2026);
 
-  // Articles specifically ordered for this issue if configured, else published articles belonging to this volume/issue
-  let currentArticles: Article[] = [];
-  if (currentIssueRecord && currentIssueRecord.articleIds && currentIssueRecord.articleIds.length > 0) {
-    const ordered = currentIssueRecord.articleIds
-      .map((id) => articles.find((a) => a.id === id))
-      .filter((a): a is Article => !!a && a.status === 'published');
-    if (ordered.length > 0) {
-      currentArticles = ordered;
+  // Articles for this issue:
+  // 1. Articles in currentIssueRecord.articleIds
+  // 2. Articles matching activeVolume & activeIssue
+  // 3. Fallback to any remaining published articles so nothing is hidden
+  const currentArticles = React.useMemo(() => {
+    if (publishedArticles.length === 0) return [];
+    const seen = new Set<string>();
+    const list: Article[] = [];
+
+    // 1. IDs in currentIssueRecord.articleIds
+    if (currentIssueRecord?.articleIds && currentIssueRecord.articleIds.length > 0) {
+      for (const id of currentIssueRecord.articleIds) {
+        const found = publishedArticles.find((a) => a.id === id);
+        if (found && !seen.has(found.id)) {
+          seen.add(found.id);
+          list.push(found);
+        }
+      }
     }
-  }
 
-  if (currentArticles.length === 0 && currentIssueRecord) {
-    const matched = publishedArticles.filter(
-      (a) => a.volume === activeVolume && a.issue === activeIssue
-    );
-    currentArticles = matched;
-  }
+    // 2. Articles matching activeVolume & activeIssue
+    for (const art of publishedArticles) {
+      if (!seen.has(art.id)) {
+        const artVol = typeof art.volume === 'number' ? art.volume : Number(art.volume) || 1;
+        const artIss = typeof art.issue === 'number' ? art.issue : Number(art.issue) || 1;
+        if (artVol === activeVolume && artIss === activeIssue) {
+          seen.add(art.id);
+          list.push(art);
+        }
+      }
+    }
+
+    // 3. Remaining published articles
+    for (const art of publishedArticles) {
+      if (!seen.has(art.id)) {
+        seen.add(art.id);
+        list.push(art);
+      }
+    }
+
+    return list;
+  }, [publishedArticles, currentIssueRecord, activeVolume, activeIssue]);
 
   const filteredArticles = filterQuery.trim()
     ? currentArticles.filter(
