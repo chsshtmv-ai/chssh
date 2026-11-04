@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { JournalContent, Article, EditorialMember, AdvisoryBoardMember, ArticleStatus, JournalUploadedAsset, Reviewer, AuthorAccount, JournalPalette, JournalVolume, JournalIssue, CmsRevision, Discipline, SubjectTrack } from '../types';
+import { JournalContent, Article, EditorialMember, AdvisoryBoardMember, ArticleStatus, JournalUploadedAsset, Reviewer, AuthorAccount, JournalPalette, JournalVolume, JournalIssue, CmsRevision, Discipline, SubjectTrack, CurrentIssuePageConfig } from '../types';
 import { initialJournalContent } from '../data/defaultContent';
 import { initialArticles, initialEditorialBoard } from '../data/defaultArticles';
 import { initialAdvisoryBoard } from '../data/defaultAdvisoryBoard';
@@ -9,6 +9,7 @@ import { initialAuthors, normalizePhoneNumber } from '../data/defaultAuthors';
 import { initialVolumes, initialIssues } from '../data/defaultVolumes';
 import { initialDisciplines } from '../data/defaultDisciplines';
 import { initialSubjectTracks } from '../data/defaultSubjectTracks';
+import { defaultCurrentIssueConfig } from '../data/defaultCurrentIssueConfig';
 import { db, firebaseConfig, auth } from '../lib/firebase';
 import {
   collection,
@@ -112,8 +113,8 @@ interface JournalContextType {
   adminPassword: string;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper' | 'disciplines-tracks';
-  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper' | 'disciplines-tracks') => void;
+  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper' | 'disciplines-tracks' | 'current-issue';
+  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper' | 'disciplines-tracks' | 'current-issue') => void;
   openAdminAssetUploader: () => void;
   selectedArticleForView: Article | null;
   setSelectedArticleForView: (article: Article | null) => void;
@@ -322,6 +323,12 @@ interface JournalContextType {
   updateSubjectTrack: (id: string, updates: Partial<SubjectTrack>) => Promise<{ success: boolean; error?: string }>;
   deleteSubjectTrack: (id: string) => Promise<{ success: boolean; error?: string }>;
   reorderSubjectTracks: (newOrderList: { id: string; order: number }[]) => Promise<{ success: boolean; error?: string }>;
+  // Current Issue Complete CMS Configuration
+  currentIssueConfig: CurrentIssuePageConfig;
+  updateCurrentIssueConfig: (partial: Partial<CurrentIssuePageConfig>) => Promise<{ success: boolean; error?: string }>;
+  publishCurrentIssueConfig: (config: CurrentIssuePageConfig) => Promise<{ success: boolean; error?: string }>;
+  saveDraftCurrentIssueConfig: (config: CurrentIssuePageConfig) => Promise<{ success: boolean; error?: string }>;
+  resetCurrentIssueConfigToDefault: () => Promise<{ success: boolean; error?: string }>;
 }
 
 const JournalContext = createContext<JournalContextType | undefined>(undefined);
@@ -634,8 +641,23 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [isLiveEditMode, setIsLiveEditMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('home');
-  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper' | 'disciplines-tracks'>('submissions');
+  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper' | 'disciplines-tracks' | 'current-issue'>('submissions');
   const [selectedArticleForView, setSelectedArticleForView] = useState<Article | null>(null);
+
+  const [currentIssueConfig, setCurrentIssueConfig] = useState<CurrentIssuePageConfig>(() => {
+    try {
+      const saved = localStorage.getItem('chssh_current_issue_config');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.header && parsed.tableDesign) {
+          return { ...defaultCurrentIssueConfig, ...parsed };
+        }
+      }
+    } catch (e) {
+      console.error('Error loading local current issue config', e);
+    }
+    return defaultCurrentIssueConfig;
+  });
 
   const [disciplines, setDisciplines] = useState<Discipline[]>(() => {
     try {
@@ -1011,6 +1033,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let unsubscribeIssues: (() => void) | undefined;
     let unsubscribeDisciplines: (() => void) | undefined;
     let unsubscribeTracks: (() => void) | undefined;
+    let unsubscribeCurrentIssue: (() => void) | undefined;
 
     try {
       const contentDocRef = doc(db, 'journal_content', 'main');
@@ -1405,6 +1428,35 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
           console.warn('Firestore subject tracks listener note:', error.message);
         }
       );
+
+      const currentIssueDocRef = doc(db, 'journal_content', 'current_issue');
+      unsubscribeCurrentIssue = onSnapshot(
+        currentIssueDocRef,
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as CurrentIssuePageConfig;
+            setCurrentIssueConfig(prev => ({
+              ...defaultCurrentIssueConfig,
+              ...data,
+              header: { ...defaultCurrentIssueConfig.header, ...(data.header || {}) },
+              downloads: { ...defaultCurrentIssueConfig.downloads, ...(data.downloads || {}) },
+              tableDesign: {
+                ...defaultCurrentIssueConfig.tableDesign,
+                ...(data.tableDesign || {}),
+                columns: data.tableDesign?.columns || defaultCurrentIssueConfig.tableDesign.columns
+              },
+              footer: { ...defaultCurrentIssueConfig.footer, ...(data.footer || {}) },
+              pageAppearance: { ...defaultCurrentIssueConfig.pageAppearance, ...(data.pageAppearance || {}) }
+            }));
+            safeLocalStorageSet('chssh_current_issue_config', JSON.stringify(data));
+          } else {
+            setCurrentIssueConfig(defaultCurrentIssueConfig);
+          }
+        },
+        (error) => {
+          console.warn('Firestore current_issue config listener note:', error.message);
+        }
+      );
     } catch (e) {
       console.warn('Firebase initialization error:', e);
       setFirebaseStatus('error');
@@ -1426,6 +1478,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (unsubscribeIssues) unsubscribeIssues();
       if (unsubscribeDisciplines) unsubscribeDisciplines();
       if (unsubscribeTracks) unsubscribeTracks();
+      if (unsubscribeCurrentIssue) unsubscribeCurrentIssue();
     };
   }, []);
 
@@ -4525,6 +4578,96 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const updateCurrentIssueConfig = async (
+    partial: Partial<CurrentIssuePageConfig>
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('updateCurrentIssueConfig')) {
+      return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    }
+    const updated: CurrentIssuePageConfig = {
+      ...currentIssueConfig,
+      ...partial,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: 'chsshtmv@gmail.com'
+    };
+    setCurrentIssueConfig(updated);
+    safeLocalStorageSet('chssh_current_issue_config', JSON.stringify(updated));
+
+    try {
+      const docRef = doc(db, 'journal_content', 'current_issue');
+      await setDoc(docRef, cleanForFirestore(updated), { merge: true });
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error updating current_issue config in Firestore:', err);
+      return { success: false, error: err.message || 'Failed to update Firestore.' };
+    }
+  };
+
+  const publishCurrentIssueConfig = async (
+    config: CurrentIssuePageConfig
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('publishCurrentIssueConfig')) {
+      return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    }
+    const published: CurrentIssuePageConfig = {
+      ...config,
+      status: 'published',
+      lastUpdated: new Date().toISOString(),
+      updatedBy: 'chsshtmv@gmail.com'
+    };
+    setCurrentIssueConfig(published);
+    safeLocalStorageSet('chssh_current_issue_config', JSON.stringify(published));
+
+    try {
+      const docRef = doc(db, 'journal_content', 'current_issue');
+      await setDoc(docRef, cleanForFirestore(published));
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error publishing current_issue config to Firestore:', err);
+      return { success: false, error: err.message || 'Failed to publish to Firestore.' };
+    }
+  };
+
+  const saveDraftCurrentIssueConfig = async (
+    config: CurrentIssuePageConfig
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('saveDraftCurrentIssueConfig')) {
+      return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    }
+    const draft: CurrentIssuePageConfig = {
+      ...config,
+      status: 'draft',
+      lastUpdated: new Date().toISOString(),
+      updatedBy: 'chsshtmv@gmail.com'
+    };
+    safeLocalStorageSet('chssh_current_issue_draft', JSON.stringify(draft));
+
+    try {
+      const docRef = doc(db, 'journal_content', 'current_issue_draft');
+      await setDoc(docRef, cleanForFirestore(draft));
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error saving draft current_issue config to Firestore:', err);
+      return { success: false, error: err.message || 'Failed to save draft to Firestore.' };
+    }
+  };
+
+  const resetCurrentIssueConfigToDefault = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('resetCurrentIssueConfigToDefault')) {
+      return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    }
+    setCurrentIssueConfig(defaultCurrentIssueConfig);
+    safeLocalStorageSet('chssh_current_issue_config', JSON.stringify(defaultCurrentIssueConfig));
+    try {
+      const docRef = doc(db, 'journal_content', 'current_issue');
+      await setDoc(docRef, cleanForFirestore(defaultCurrentIssueConfig));
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error resetting current_issue config in Firestore:', err);
+      return { success: false, error: err.message || 'Failed to reset Firestore config.' };
+    }
+  };
+
   return (
     <JournalContext.Provider
       value={{
@@ -4681,7 +4824,12 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addSubjectTrack,
         updateSubjectTrack,
         deleteSubjectTrack,
-        reorderSubjectTracks
+        reorderSubjectTracks,
+        currentIssueConfig,
+        updateCurrentIssueConfig,
+        publishCurrentIssueConfig,
+        saveDraftCurrentIssueConfig,
+        resetCurrentIssueConfigToDefault
       }}
     >
       {children}

@@ -1,14 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useJournal } from '../context/JournalContext';
-import { EditableText } from './EditableText';
+import { JournalCrest } from './JournalCrest';
 import { ArticleDoiBadge } from './ArticleDoiBadge';
-import { printPublicationCertificate, triggerFileDownload } from '../utils/downloadGenerators';
+import { triggerFileDownload } from '../utils/downloadGenerators';
 import { getAssetFile } from '../utils/fileStorage';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import { GoogleDrivePreviewModal } from './GoogleDrivePreviewModal';
-import { JournalUploadedAsset, Article } from '../types';
-import { getFreshPdfUrl } from '../services/pdfStorageService';
-import { motion } from 'motion/react';
+import { JournalUploadedAsset, Article, CurrentIssuePageConfig } from '../types';
+import { defaultCurrentIssueConfig } from '../data/defaultCurrentIssueConfig';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Download,
   Search,
@@ -20,25 +20,33 @@ import {
   Loader2,
   ExternalLink,
   Clock,
-  FileText
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Sparkles
 } from 'lucide-react';
 
-export const CurrentIssue: React.FC = () => {
+interface CurrentIssueProps {
+  previewConfig?: CurrentIssuePageConfig;
+}
+
+export const CurrentIssue: React.FC<CurrentIssueProps> = ({ previewConfig }) => {
   const {
     articles,
     issues,
     volumes,
     setSelectedArticleForView,
     uploadedAssets,
-    content,
     setActiveTab,
-    requireAuthorAuth,
     downloadPublishedPaper,
     fetchActivePdf,
     activePdf,
-    isAdmin
+    isAdmin,
+    currentIssueConfig
   } = useJournal();
+
   const [filterQuery, setFilterQuery] = useState('');
+  const [expandedAbstracts, setExpandedAbstracts] = useState<Record<string, boolean>>({});
 
   // Cover preview modal state
   const [previewCoverAsset, setPreviewCoverAsset] = useState<JournalUploadedAsset | null>(null);
@@ -50,566 +58,645 @@ export const CurrentIssue: React.FC = () => {
   const [isArticlePreviewOpen, setIsArticlePreviewOpen] = useState(false);
   const [isLoadingCover, setIsLoadingCover] = useState(false);
 
-  const coverAsset = uploadedAssets?.['cover_page'] || uploadedAssets?.['active_pdf'] || activePdf;
+  // Effective layout & content configuration
+  const config: CurrentIssuePageConfig = useMemo(() => {
+    const base = previewConfig || currentIssueConfig || defaultCurrentIssueConfig;
+    return {
+      ...defaultCurrentIssueConfig,
+      ...base,
+      header: { ...defaultCurrentIssueConfig.header, ...(base.header || {}) },
+      downloads: { ...defaultCurrentIssueConfig.downloads, ...(base.downloads || {}) },
+      tableDesign: {
+        ...defaultCurrentIssueConfig.tableDesign,
+        ...(base.tableDesign || {}),
+        columns: base.tableDesign?.columns || defaultCurrentIssueConfig.tableDesign.columns
+      },
+      footer: { ...defaultCurrentIssueConfig.footer, ...(base.footer || {}) },
+      pageAppearance: { ...defaultCurrentIssueConfig.pageAppearance, ...(base.pageAppearance || {}) }
+    };
+  }, [previewConfig, currentIssueConfig]);
 
-  // Always fetch latest active PDF from Firebase Firestore on component mount
-  useEffect(() => {
-    fetchActivePdf('cover_page').catch((err) => {
-      console.warn('Initial active PDF fetch note:', err);
-    });
-  }, []);
+  // Dynamically resolve Current Issue from published issues in Firestore
+  const currentIssueRecord = useMemo(() => {
+    return (
+      issues.find(i => i.isCurrent && (i.status === 'published' || !i.status)) ||
+      issues.find(i => i.isCurrent) ||
+      issues.find(i => i.status === 'published')
+    );
+  }, [issues]);
 
-  const publishedArticles = React.useMemo(() => {
-    return articles.filter((a) => a.status === 'published' || (a as any).isPublishedLive === true);
-  }, [articles]);
-  
-  // Dynamically resolve Current Issue exclusively from managed published issues collection in Firestore
-  const currentIssueRecord =
-    issues.find((i) => i.isCurrent && (i.status === 'published' || !i.status)) ||
-    issues.find((i) => i.status === 'published');
+  const activeVolume = currentIssueRecord ? currentIssueRecord.volumeNumber : 1;
+  const activeIssue = currentIssueRecord ? currentIssueRecord.issueNumber : 1;
+  const activeMonth = currentIssueRecord?.publicationMonth || 'September';
+  const activeYear = currentIssueRecord ? currentIssueRecord.year : 2026;
 
-  const activeVolume = currentIssueRecord ? currentIssueRecord.volumeNumber : (publishedArticles[0]?.volume || 1);
-  const activeIssue = currentIssueRecord ? currentIssueRecord.issueNumber : (publishedArticles[0]?.issue || 1);
-  const activeYear = currentIssueRecord ? currentIssueRecord.year : (publishedArticles[0]?.year || 2026);
+  // STRICT FILTERING: Only published articles explicitly assigned to this current issue
+  const currentArticles = useMemo(() => {
+    if (!currentIssueRecord) return [];
+    const publishedPool = articles.filter(a => a.status === 'published');
+    const assignedIds = currentIssueRecord.articleIds || [];
 
-  // Articles for this issue:
-  // 1. Articles in currentIssueRecord.articleIds
-  // 2. Articles matching activeVolume & activeIssue
-  // 3. Fallback to any remaining published articles so nothing is hidden
-  const currentArticles = React.useMemo(() => {
-    if (publishedArticles.length === 0) return [];
+    // Order strictly by administrator's saved sequence in articleIds
+    const ordered: Article[] = [];
     const seen = new Set<string>();
-    const list: Article[] = [];
 
-    // 1. IDs in currentIssueRecord.articleIds
-    if (currentIssueRecord?.articleIds && currentIssueRecord.articleIds.length > 0) {
-      for (const id of currentIssueRecord.articleIds) {
-        const found = publishedArticles.find((a) => a.id === id);
-        if (found && !seen.has(found.id)) {
-          seen.add(found.id);
-          list.push(found);
-        }
+    assignedIds.forEach(id => {
+      const found = publishedPool.find(a => a.id === id);
+      if (found && !seen.has(found.id)) {
+        seen.add(found.id);
+        ordered.push(found);
       }
-    }
+    });
 
-    // 2. Articles matching activeVolume & activeIssue
-    for (const art of publishedArticles) {
+    // Also include published articles that have matching volume and issue numbers
+    publishedPool.forEach(art => {
       if (!seen.has(art.id)) {
         const artVol = typeof art.volume === 'number' ? art.volume : Number(art.volume) || 1;
         const artIss = typeof art.issue === 'number' ? art.issue : Number(art.issue) || 1;
         if (artVol === activeVolume && artIss === activeIssue) {
           seen.add(art.id);
-          list.push(art);
+          ordered.push(art);
         }
       }
-    }
+    });
 
-    // 3. Remaining published articles
-    for (const art of publishedArticles) {
-      if (!seen.has(art.id)) {
-        seen.add(art.id);
-        list.push(art);
-      }
-    }
+    return ordered;
+  }, [articles, currentIssueRecord, activeVolume, activeIssue]);
 
-    return list;
-  }, [publishedArticles, currentIssueRecord, activeVolume, activeIssue]);
+  const filteredArticles = useMemo(() => {
+    if (!filterQuery.trim()) return currentArticles;
+    const q = filterQuery.toLowerCase();
+    return currentArticles.filter(
+      a =>
+        a.title.toLowerCase().includes(q) ||
+        (a.abstract && a.abstract.toLowerCase().includes(q)) ||
+        a.authors.some(auth => auth.name.toLowerCase().includes(q)) ||
+        (a.doi && a.doi.toLowerCase().includes(q)) ||
+        (a.track && a.track.toLowerCase().includes(q))
+    );
+  }, [currentArticles, filterQuery]);
 
-  const filteredArticles = filterQuery.trim()
-    ? currentArticles.filter(
-        (a) =>
-          a.title.toLowerCase().includes(filterQuery.toLowerCase()) ||
-          a.abstract.toLowerCase().includes(filterQuery.toLowerCase()) ||
-          a.authors.some((auth) => auth.name.toLowerCase().includes(filterQuery.toLowerCase()))
-      )
-    : currentArticles;
-
-  const hasGenuineCover = Boolean(
-    coverAsset?.isUploaded &&
-    (coverAsset?.downloadURL || coverAsset?.fileUrl || coverAsset?.fileDataUrl)
-  );
-
-  const handlePreviewCover = async () => {
-    setIsLoadingCover(true);
-    try {
-      let current = coverAsset;
-      try {
-        const fresh = await fetchActivePdf('cover_page');
-        if (fresh) current = fresh;
-      } catch (err) {
-        console.warn('Note on fetching latest PDF from Firebase:', err);
-      }
-
-      const effectiveUrl = current?.downloadURL || current?.fileUrl || current?.fileDataUrl;
-      let finalUrl = effectiveUrl;
-
-      if (!finalUrl) {
-        finalUrl = (await getAssetFile('cover_page')) || undefined;
-      }
-
-      if (!finalUrl) {
-        alert('No official cover document has been uploaded yet.');
-        return;
-      }
-
-      setPreviewCoverAsset({
-        id: 'cover_page',
-        title: current?.title || 'Journal Issue Cover Page (Vol. 7, No. 1)',
-        description: 'Official front cover of Contemporary Horizons in Social Sciences and Humanities',
-        category: 'cover',
-        fileName: current?.fileName || 'CHSSH_Volume_7_Cover.pdf',
-        fileSize: current?.fileSize || 'Standard Document',
-        fileType: current?.fileType || 'application/pdf',
-        downloadURL: current?.downloadURL,
-        fileUrl: current?.downloadURL || current?.fileUrl,
-        fileDataUrl: finalUrl.startsWith('http') ? getFreshPdfUrl(finalUrl) : finalUrl,
-        uploadedAt: current?.uploadedAt || new Date().toISOString(),
-        isUploaded: true
-      });
-      setIsCoverPreviewOpen(true);
-    } catch (err) {
-      console.error('Error opening cover preview:', err);
-    } finally {
-      setIsLoadingCover(false);
-    }
+  const toggleAbstract = (id: string) => {
+    setExpandedAbstracts(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleDownloadCover = async () => {
-    setIsDownloadingCover(true);
-    try {
-      let current = coverAsset;
-      try {
-        const fresh = await fetchActivePdf('cover_page');
-        if (fresh) current = fresh;
-      } catch {}
-
-      const targetUrl = current?.downloadURL || current?.fileUrl || current?.fileDataUrl;
-      if (targetUrl) {
-        triggerFileDownload(
-          targetUrl,
-          current?.fileName || 'CHSSH_Volume_7_Cover.pdf',
-          current?.fileType || 'application/pdf'
-        );
-        return;
-      }
-
-      const localUrl = (await getAssetFile('cover_page')) || undefined;
-      if (localUrl) {
-        triggerFileDownload(
-          localUrl,
-          current?.fileName || 'CHSSH_Volume_7_Cover.pdf',
-          current?.fileType || 'application/pdf'
-        );
-      }
-    } finally {
-      setTimeout(() => setIsDownloadingCover(false), 1000);
+  // Generic document link handler
+  const handleOpenDoc = (url?: string, label?: string) => {
+    if (!url) {
+      alert(`The document for "${label || 'Download'}" has not been uploaded yet.`);
+      return;
     }
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  if (!currentIssueRecord) {
+  // If issue is unpublished and not in preview mode, render configurable empty-state message
+  const isPageVisible = previewConfig || config.status === 'published';
+
+  if (!isPageVisible || !currentIssueRecord) {
     return (
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-xs border border-stone-200/90 dark:border-stone-800 p-12 text-center space-y-4">
-          <BookOpen className="w-12 h-12 mx-auto text-stone-400 dark:text-stone-500" />
-          <h2 className="font-serif text-2xl font-bold text-stone-800 dark:text-stone-200">
-            No current issue has been published yet.
+      <div className={`${config.pageAppearance.containerWidth || 'max-w-6xl'} mx-auto py-12 px-4`}>
+        <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-xs border border-stone-200 dark:border-stone-800 p-12 text-center space-y-4">
+          <BookOpen className="w-12 h-12 mx-auto text-[#0d9488]" />
+          <h2 className="font-serif text-2xl font-bold text-slate-800 dark:text-slate-200">
+            {config.headingTitle || 'Current Issue'}
           </h2>
-          <p className="text-xs sm:text-sm text-stone-500 dark:text-stone-400 max-w-md mx-auto">
-            When the administrator publishes the current issue through the Admin Panel, it will appear here.
+          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xl mx-auto font-serif leading-relaxed">
+            {config.pageAppearance.emptyStateMessage || 'No current issue has been published yet. Peer-reviewed manuscripts approved by the editorial office will appear here.'}
           </p>
+          {isAdmin && (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('admin');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#0d9488] text-white text-xs font-semibold shadow-xs hover:bg-teal-700 transition"
+              >
+                <span>Open Current Issue CMS</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
+  // Column visibility map
+  const colMap = (id: string) => config.tableDesign.columns.find(c => c.id === id);
+
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      {/* Issue Masthead Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
+    <div
+      className={`${config.pageAppearance.containerWidth || 'max-w-6xl'} mx-auto py-6 px-3 sm:px-6 ${
+        config.pageAppearance.spacing === 'compact'
+          ? 'space-y-4'
+          : config.pageAppearance.spacing === 'relaxed'
+          ? 'space-y-8'
+          : 'space-y-6'
+      }`}
+      style={{
+        backgroundColor: config.pageAppearance.bgColor || '#ffffff'
+      }}
+    >
+      {/* 1. JOURNAL HEADER MASTHEAD (Following Supplied Reference Design) */}
+      <motion.header
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="bg-white dark:bg-stone-900 rounded-2xl shadow-xs border border-stone-200/90 dark:border-stone-800 p-6 sm:p-8 space-y-4 relative overflow-hidden transition-colors"
+        transition={{ duration: 0.3 }}
+        className={`rounded-2xl border border-stone-200 dark:border-stone-800 transition-colors shadow-2xs ${
+          config.header.headerSpacing === 'compact'
+            ? 'p-4 sm:p-5'
+            : config.header.headerSpacing === 'spacious'
+            ? 'p-8 sm:p-10'
+            : 'p-6 sm:p-8'
+        }`}
+        style={{
+          backgroundColor: config.header.headerBgColor || '#ffffff',
+          color: config.header.headerTextColor || '#0f172a'
+        }}
       >
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold text-[#1c355e] dark:text-sky-400 uppercase tracking-widest">
-            <span className="w-2 h-2 rounded-full bg-[#1c355e] dark:bg-sky-400 animate-pulse" />
-            <span>
-              <EditableText id="current_issue_badge" placeholder="Latest Publication Online" />
+        <div
+          className={`flex flex-col ${
+            config.header.logoAlignment === 'center'
+              ? 'items-center text-center'
+              : 'sm:flex-row sm:items-center text-left'
+          } gap-5 sm:gap-7`}
+        >
+          {/* Official Circular Teal CHSSH Logo */}
+          <div className="shrink-0 flex items-center justify-center">
+            {config.header.logoUrl && config.header.logoUrl !== '/assets/chssh_logo.jpg' ? (
+              <img
+                src={config.header.logoUrl}
+                alt={config.header.abbreviation || 'CHSSH Logo'}
+                className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover ring-2 ring-[#0d9488]/40 shadow-sm"
+              />
+            ) : (
+              <JournalCrest size={config.header.logoSize || 'lg'} showShadow />
+            )}
+          </div>
+
+          {/* Header Typography */}
+          <div className="space-y-2 flex-1">
+            <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
+              <span className="text-xs font-bold tracking-widest uppercase text-[#0d9488] font-mono">
+                {config.header.abbreviation || 'CHSSH'}
+              </span>
+              <span className="text-stone-300 dark:text-stone-700">|</span>
+              <span className="text-xs font-serif italic text-stone-500 dark:text-stone-400">
+                {config.header.tagline || 'A Multidisciplinary Peer Review Journal'}
+              </span>
+            </div>
+
+            <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 leading-tight">
+              {config.header.fullName || 'Contemporary Horizons in Social Sciences and Humanities'}
+            </h1>
+
+            <div className="flex flex-wrap items-center gap-3 pt-1 justify-center sm:justify-start text-xs font-mono text-slate-600 dark:text-slate-400">
+              <span className="bg-stone-100 dark:bg-stone-800 px-2.5 py-1 rounded-md border border-stone-200 dark:border-stone-700">
+                ISSN: <strong className="text-slate-900 dark:text-slate-100">{config.header.issnOnline || '3048-9741'}</strong> (Online)
+              </span>
+              <span className="bg-stone-100 dark:bg-stone-800 px-2.5 py-1 rounded-md border border-stone-200 dark:border-stone-700">
+                ISSN: <strong className="text-slate-900 dark:text-slate-100">{config.header.issnPrint || '3048-9733'}</strong> (Print)
+              </span>
+            </div>
+          </div>
+        </div>
+      </motion.header>
+
+      {/* 2. BELOW HEADER: HEADING & THREE PRIMARY DOWNLOAD BUTTONS */}
+      <section className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/90 dark:border-stone-800 p-5 sm:p-6 shadow-2xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#0d9488] animate-pulse" />
+              <h2 className="text-lg sm:text-xl font-serif font-bold text-slate-900 dark:text-slate-100 tracking-wide uppercase">
+                {config.headingTitle || 'Current Issue'}
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 font-serif mt-0.5">
+              Volume {activeVolume}, Issue {activeIssue} — {activeMonth} {activeYear}
+            </p>
+          </div>
+
+          {/* Three Primary Download Buttons */}
+          <div
+            className={`flex flex-wrap items-center gap-2.5 ${
+              config.downloads.buttonAlignment === 'left'
+                ? 'justify-start'
+                : config.downloads.buttonAlignment === 'right'
+                ? 'justify-end'
+                : 'justify-center md:justify-end'
+            }`}
+          >
+            {/* Download Front Page */}
+            {config.downloads.frontPageVisible && (
+              <button
+                type="button"
+                onClick={() =>
+                  handleOpenDoc(
+                    config.downloads.frontPagePdfUrl || currentIssueRecord?.frontPagePdfUrl,
+                    config.downloads.frontPageLabel
+                  )
+                }
+                style={{
+                  backgroundColor: config.downloads.frontPageBgColor || '#0d9488',
+                  color: config.downloads.frontPageTextColor || '#ffffff'
+                }}
+                className={`inline-flex items-center gap-2 rounded-xl font-semibold shadow-xs hover:opacity-90 transition-opacity cursor-pointer ${
+                  config.downloads.buttonSize === 'sm'
+                    ? 'px-3 py-1.5 text-xs'
+                    : config.downloads.buttonSize === 'lg'
+                    ? 'px-5 py-2.5 text-sm'
+                    : 'px-4 py-2 text-xs'
+                }`}
+                title="Download / Open Front Page PDF"
+              >
+                <FileText className="w-4 h-4 shrink-0" />
+                <span>{config.downloads.frontPageLabel || 'Download Front Page'}</span>
+                <ExternalLink className="w-3 h-3 opacity-70 ml-0.5" />
+              </button>
+            )}
+
+            {/* Download Table of Contents */}
+            {config.downloads.tocVisible && (
+              <button
+                type="button"
+                onClick={() =>
+                  handleOpenDoc(
+                    config.downloads.tocPdfUrl || currentIssueRecord?.tocPdfUrl,
+                    config.downloads.tocLabel
+                  )
+                }
+                style={{
+                  backgroundColor: config.downloads.tocBgColor || '#1e3a8a',
+                  color: config.downloads.tocTextColor || '#ffffff'
+                }}
+                className={`inline-flex items-center gap-2 rounded-xl font-semibold shadow-xs hover:opacity-90 transition-opacity cursor-pointer ${
+                  config.downloads.buttonSize === 'sm'
+                    ? 'px-3 py-1.5 text-xs'
+                    : config.downloads.buttonSize === 'lg'
+                    ? 'px-5 py-2.5 text-sm'
+                    : 'px-4 py-2 text-xs'
+                }`}
+                title="Download / Open Table of Contents PDF"
+              >
+                <FileText className="w-4 h-4 shrink-0" />
+                <span>{config.downloads.tocLabel || 'Download Table of Contents'}</span>
+                <ExternalLink className="w-3 h-3 opacity-70 ml-0.5" />
+              </button>
+            )}
+
+            {/* Download Certificates */}
+            {config.downloads.certificatesVisible && (
+              <button
+                type="button"
+                onClick={() =>
+                  handleOpenDoc(
+                    config.downloads.certificatesPdfUrl || currentIssueRecord?.certificatesPdfUrl,
+                    config.downloads.certificatesLabel
+                  )
+                }
+                style={{
+                  backgroundColor: config.downloads.certificatesBgColor || '#d97706',
+                  color: config.downloads.certificatesTextColor || '#ffffff'
+                }}
+                className={`inline-flex items-center gap-2 rounded-xl font-semibold shadow-xs hover:opacity-90 transition-opacity cursor-pointer ${
+                  config.downloads.buttonSize === 'sm'
+                    ? 'px-3 py-1.5 text-xs'
+                    : config.downloads.buttonSize === 'lg'
+                    ? 'px-5 py-2.5 text-sm'
+                    : 'px-4 py-2 text-xs'
+                }`}
+                title="Download / Open Publication Certificates"
+              >
+                <Award className="w-4 h-4 shrink-0" />
+                <span>{config.downloads.certificatesLabel || 'Download Certificates'}</span>
+                <ExternalLink className="w-3 h-3 opacity-70 ml-0.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 3. ISSUE INFORMATION STRIP */}
+        <div className="bg-stone-50 dark:bg-stone-800/60 rounded-xl p-3 sm:p-4 border border-stone-200/80 dark:border-stone-700/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 font-serif">
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              Volume: <strong className="font-mono text-[#0d9488]">{activeVolume}</strong>
+            </span>
+            <span className="text-stone-300 dark:text-stone-700">•</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              Issue: <strong className="font-mono text-[#0d9488]">{activeIssue}</strong>
+            </span>
+            <span className="text-stone-300 dark:text-stone-700">•</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              Month: <strong className="text-slate-900 dark:text-slate-100">{activeMonth}</strong>
+            </span>
+            <span className="text-stone-300 dark:text-stone-700">•</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              Year: <strong className="font-mono text-slate-900 dark:text-slate-100">{activeYear}</strong>
             </span>
           </div>
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-            ISSN: <EditableText id="issn_online" className="text-sky-700 dark:text-sky-400 font-semibold" /> (Online) |{' '}
-            <EditableText id="issn_print" /> (Print)
+
+          <div className="text-xs text-slate-500 font-serif">
+            Showing <strong className="text-slate-800 dark:text-slate-200 font-mono">{filteredArticles.length}</strong> published paper(s)
           </div>
         </div>
+      </section>
 
-        <div className="flex flex-col md:flex-row items-start justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-tight">
-              {currentIssueRecord.title || `Volume ${activeVolume}, Issue ${activeIssue} (${activeYear})`}
-            </h1>
-            {currentIssueRecord.tableOfContentsSummary && (
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-serif leading-relaxed">
-                {currentIssueRecord.tableOfContentsSummary}
-              </p>
-            )}
-            {currentIssueRecord.editorialPdfUrl && (
-              <div className="pt-1">
-                <a
-                  href={currentIssueRecord.editorialPdfUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-800 dark:text-sky-300 text-xs font-semibold hover:bg-sky-100 dark:hover:bg-sky-900/50 transition cursor-pointer"
-                >
-                  <FileText className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                  <span>{currentIssueRecord.editorialPdfName || 'Editorial Remarks & Introduction (PDF)'}</span>
-                  <ExternalLink className="w-3 h-3 opacity-70 ml-0.5" />
-                </a>
-              </div>
-            )}
-          </div>
-
-          {/* Issue Cover Artwork / Folio */}
-          <div className="shrink-0 w-full md:w-56">
-            {coverAsset?.fileDataUrl?.startsWith('data:image/') || currentIssueRecord?.coverImage ? (
-              <div className="bg-[#0f1f38] dark:bg-slate-850 rounded-xl overflow-hidden border border-[#1c355e]/40 dark:border-slate-750 shadow-md group relative">
-                <img
-                  src={currentIssueRecord?.coverImage || coverAsset?.fileDataUrl}
-                  alt={currentIssueRecord?.title || coverAsset?.title || 'Journal Cover Artwork'}
-                  className="w-full h-48 object-cover object-top transition duration-300 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center p-2 text-center text-white space-y-2">
-                  <span className="text-[11px] font-bold font-serif">{currentIssueRecord?.title || coverAsset?.title}</span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={handlePreviewCover}
-                      className="px-2.5 py-1 rounded bg-sky-700 hover:bg-sky-800 text-white text-[11px] font-semibold flex items-center gap-1 shadow cursor-pointer"
-                    >
-                      <Eye className="w-3 h-3" /> Preview
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDownloadCover}
-                      className="px-2.5 py-1 rounded bg-[#1c355e] hover:bg-[#102344] text-white text-[11px] font-semibold flex items-center gap-1 shadow cursor-pointer"
-                    >
-                      <Download className="w-3 h-3" /> Download
-                    </button>
-                  </div>
-                </div>
-                <div className="p-2 text-center bg-[#0a162b]/95 border-t border-[#1c355e]/50 text-[10px] text-sky-300 font-mono">
-                  Vol. {activeVolume} • No. {activeIssue} ({activeYear})
-                </div>
-              </div>
-            ) : (
-              <div className="bg-[#102344] dark:bg-slate-850 text-slate-100 p-4 rounded-xl border border-[#1c355e] dark:border-slate-750 shadow-md text-center space-y-2">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-sky-300">
-                  <EditableText id="current_issue_folio_label" placeholder="CHSSH Issue Folio" />
-                </div>
-                <div className="text-lg font-serif font-bold text-white">
-                  Vol. {activeVolume} • No. {activeIssue} ({activeYear})
-                </div>
-
-                {coverAsset?.isUploaded && (
-                  <div className="text-[10px] text-emerald-300 font-mono flex items-center justify-center gap-1 truncate" title={coverAsset.fileName}>
-                    <FileCheck className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{coverAsset.fileName}</span>
-                  </div>
-                )}
-
-                {hasGenuineCover ? (
-                  <div className="pt-1 flex flex-col gap-1.5">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={handlePreviewCover}
-                        disabled={isLoadingCover}
-                        className="flex-1 py-1 px-2 rounded text-[11px] font-semibold bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 flex items-center justify-center gap-1 cursor-pointer transition disabled:opacity-50"
-                        title="Preview official cover document"
-                      >
-                        {isLoadingCover ? (
-                          <>
-                            <Loader2 className="w-3 h-3 animate-spin text-sky-300" />
-                            <span>Loading PDF...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="w-3 h-3" />
-                            <span>Preview</span>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleDownloadCover}
-                        disabled={isDownloadingCover}
-                        className="flex-1 py-1 px-2 rounded text-[11px] font-semibold bg-emerald-600/30 hover:bg-emerald-600/40 text-emerald-200 border border-emerald-400/30 flex items-center justify-center gap-1 cursor-pointer transition"
-                        title="Download official cover document"
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>{isDownloadingCover ? '...' : 'Download'}</span>
-                      </button>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveTab('admin');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className="w-full py-0.5 px-1.5 rounded text-[10px] text-slate-400 hover:text-white hover:bg-white/5 flex items-center justify-center gap-1 cursor-pointer transition"
-                      title="Manage journal documents in Admin CMS"
-                    >
-                      <Upload className="w-2.5 h-2.5 text-amber-400" />
-                      <span>Manage in CMS</span>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="pt-1 text-[11px] text-slate-300 font-serif italic py-1">
-                    Cover in preparation by editorial office
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setActiveTab('admin');
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
-                        className="w-full mt-2 py-1 px-2 rounded text-[10px] bg-sky-500/20 hover:bg-sky-500/30 text-sky-200 border border-sky-400/30 flex items-center justify-center gap-1 cursor-pointer transition"
-                      >
-                        <Upload className="w-2.5 h-2.5 text-amber-400" />
-                        <span>Upload Cover in CMS</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+      {/* SEARCH FILTER */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={filterQuery}
+            onChange={e => setFilterQuery(e.target.value)}
+            placeholder="Search within this issue..."
+            className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 text-stone-800 dark:text-stone-200 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#0d9488]"
+          />
         </div>
-      </motion.div>
-
-      {/* Table of Contents Header & Search */}
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-800 dark:text-stone-200">
-              <EditableText id="current_issue_toc_heading" placeholder="Articles in this Issue" />
-            </h3>
-            <p className="text-xs text-stone-500 dark:text-stone-400 font-serif">
-              Showing {filteredArticles.length} published peer-reviewed contributions
-            </p>
-          </div>
-
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={filterQuery}
-              onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Search issue papers..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-800 dark:text-stone-200 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#102344]"
-            />
-          </div>
-        </div>
-
-        {/* Article Cards or Empty State */}
-        {currentArticles.length === 0 ? (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
-            <BookOpen className="w-10 h-10 mx-auto text-stone-400" />
-            <h4 className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">
-              No papers have been published yet.
-            </h4>
-            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-md mx-auto">
-              Peer-reviewed manuscripts approved by the editorial office will appear here upon publication.
-            </p>
-          </div>
-        ) : filteredArticles.length === 0 ? (
-          <div className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200 dark:border-stone-800 p-12 text-center space-y-3">
-            <Search className="w-8 h-8 text-stone-300 dark:text-stone-600 mx-auto" />
-            <div className="font-serif text-lg font-bold text-stone-800 dark:text-stone-200">
-              No articles match your search criteria.
-            </div>
-            <p className="text-xs text-stone-500 dark:text-stone-400 max-w-sm mx-auto">
-              Try adjusting your search query or clear the filter.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {filteredArticles.map((article, idx) => (
-              <motion.article
-                key={article.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="bg-white dark:bg-stone-900 rounded-xl border border-stone-200/90 dark:border-stone-800 p-5 sm:p-6 shadow-2xs hover:shadow-sm transition-all space-y-3"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <span className="font-semibold text-[#1c355e] dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-2.5 py-0.5 rounded-full border border-sky-200/60 dark:border-sky-800/60 text-[11px]">
-                    {article.track}
-                  </span>
-                  <span className="text-stone-500 font-mono text-[11px]">
-                    Pages: {article.pages || '—'} | Vol. {article.volume || activeVolume || 1}, No. {article.issue || activeIssue || 1}
-                  </span>
-                </div>
-
-                <h2
-                  onClick={() => setSelectedArticleForView(article)}
-                  className="font-serif text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 hover:text-[#1c355e] dark:hover:text-sky-400 cursor-pointer transition-colors"
-                >
-                  {article.title}
-                </h2>
-
-                <p className="text-xs font-serif text-stone-600 dark:text-stone-300">
-                  By: {article.authors.map((a) => a.name).join(', ')} ({article.authors[0]?.affiliation})
-                </p>
-
-                <p className="text-xs text-stone-600 dark:text-stone-300 line-clamp-3 leading-relaxed">
-                  {article.abstract}
-                </p>
-
-                {/* Published Paper Google Drive Link if provided by Admin */}
-                {article.driveUrl && (
-                  <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-sky-50/90 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-850 text-xs">
-                    <span className="font-semibold text-slate-800 dark:text-slate-200 shrink-0">
-                      Drive Link:
-                    </span>
-                    <a
-                      href={article.driveUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sky-700 dark:text-sky-300 hover:text-sky-900 dark:hover:text-sky-100 hover:underline font-mono text-[11px] flex items-center gap-1.5 break-all"
-                      title={`Open uploaded paper in Google Drive: ${article.driveUrl}`}
-                    >
-                      <span className="truncate max-w-xs sm:max-w-md">{article.driveUrl}</span>
-                      <ExternalLink className="w-3 h-3 shrink-0" />
-                    </a>
-                  </div>
-                )}
-
-                <div className="pt-3 border-t border-stone-100 dark:border-stone-800/80 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    {article.doi && <ArticleDoiBadge doi={article.doi} />}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPreviewArticle(article);
-                        setIsArticlePreviewOpen(true);
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-stone-800 dark:hover:bg-stone-750 text-slate-800 dark:text-stone-200 border border-slate-200/80 dark:border-stone-700 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                      title="Preview published research document"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
-                      <span>Preview</span>
-                    </button>
-                    {/* Certificate Button (Active when admin has added certificate link) */}
-                    {article.certificateUrl ? (
-                      <a
-                        href={article.certificateUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer"
-                        title="Download / Open Official Publication Certificate (Google Drive)"
-                      >
-                        <Award className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                        <span>Certificate</span>
-                        <ExternalLink className="w-2.5 h-2.5 opacity-80" />
-                      </a>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedArticleForView(article)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100/80 dark:bg-stone-800/80 text-stone-400 dark:text-stone-500 rounded-lg text-xs font-medium border border-stone-200/50 dark:border-stone-750 cursor-pointer"
-                        title="Your publication certificate will be available after it is uploaded by the admin."
-                      >
-                        <Award className="w-3.5 h-3.5 opacity-60" />
-                        <span>Certificate Pending</span>
-                      </button>
-                    )}
-
-                    {/* Download Published Paper PDF - Publicly accessible without login */}
-                    <button
-                      type="button"
-                      onClick={() => downloadPublishedPaper(article)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-2xs hover:shadow-xs transition cursor-pointer"
-                      title={article.driveUrl ? `Download official published PDF (Google Drive: ${article.driveUrl})` : "Download official finalized published paper (PDF)"}
-                    >
-                      <Download className="w-3.5 h-3.5 text-emerald-200" />
-                      <span>Download PDF</span>
-                      {article.driveUrl && <ExternalLink className="w-2.5 h-2.5 opacity-80" />}
-                    </button>
-                  </div>
-                </div>
-              </motion.article>
-            ))}
-          </div>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('admin');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-stone-100 dark:bg-stone-800 text-slate-700 dark:text-slate-300 hover:bg-stone-200 text-xs font-medium cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5 text-amber-500" />
+            <span>Manage in CMS</span>
+          </button>
         )}
       </div>
 
-      {/* Cover Page Preview Modal */}
-      <DocumentPreviewModal
-        isOpen={isCoverPreviewOpen}
-        onClose={() => setIsCoverPreviewOpen(false)}
-        asset={previewCoverAsset}
-        dataUrl={previewCoverAsset?.fileDataUrl}
-        onDownload={(asset) => {
-          if (asset?.fileDataUrl) {
-            triggerFileDownload(
-              asset.fileDataUrl,
-              asset.fileName || 'CHSSH_Volume_7_Cover.pdf',
-              asset.fileType || 'application/pdf'
-            );
-          }
-        }}
-      />
+      {/* 4. ACADEMIC ARTICLE TABLE (Reference Design) */}
+      <section className="bg-white dark:bg-stone-900 rounded-2xl border border-stone-200/90 dark:border-stone-800 overflow-hidden shadow-2xs">
+        {currentArticles.length === 0 ? (
+          <div className="p-12 text-center space-y-3">
+            <BookOpen className="w-10 h-10 text-stone-300 dark:text-stone-600 mx-auto" />
+            <h4 className="font-serif text-base font-bold text-slate-800 dark:text-slate-200">
+              No articles are currently published in this issue.
+            </h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto font-serif">
+              {config.pageAppearance.emptyStateMessage}
+            </p>
+          </div>
+        ) : filteredArticles.length === 0 ? (
+          <div className="p-10 text-center space-y-2">
+            <Search className="w-8 h-8 text-stone-300 mx-auto" />
+            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              No papers match your search criteria.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table
+              className="w-full border-collapse text-left"
+              style={{
+                fontFamily: config.tableDesign.fontFamily === 'sans' ? 'sans-serif' : 'ui-serif, Georgia, Cambria, serif',
+                fontSize:
+                  config.tableDesign.fontSize === 'xs'
+                    ? '0.75rem'
+                    : config.tableDesign.fontSize === 'md'
+                    ? '0.925rem'
+                    : '0.85rem'
+              }}
+            >
+              {/* Table Header */}
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: config.tableDesign.headerBgColor || '#0d9488',
+                    color: config.tableDesign.headerTextColor || '#ffffff'
+                  }}
+                >
+                  {colMap('serial')?.visible !== false && (
+                    <th
+                      className="py-3 px-3.5 font-bold uppercase tracking-wider text-center"
+                      style={{ width: colMap('serial')?.width || '8%' }}
+                    >
+                      {colMap('serial')?.label || 'S.No'}
+                    </th>
+                  )}
+                  {colMap('authors')?.visible !== false && (
+                    <th
+                      className="py-3 px-4 font-bold uppercase tracking-wider"
+                      style={{ width: colMap('authors')?.width || '26%' }}
+                    >
+                      {colMap('authors')?.label || 'Author(s) Name'}
+                    </th>
+                  )}
+                  {colMap('title')?.visible !== false && (
+                    <th
+                      className="py-3 px-4 font-bold uppercase tracking-wider"
+                      style={{ width: colMap('title')?.width || '42%' }}
+                    >
+                      {colMap('title')?.label || 'Paper Title'}
+                    </th>
+                  )}
+                  {colMap('pages')?.visible !== false && (
+                    <th
+                      className="py-3 px-3.5 font-bold uppercase tracking-wider text-center"
+                      style={{ width: colMap('pages')?.width || '12%' }}
+                    >
+                      {colMap('pages')?.label || 'Page Numbers'}
+                    </th>
+                  )}
+                  {colMap('download')?.visible !== false && (
+                    <th
+                      className="py-3 px-3.5 font-bold uppercase tracking-wider text-center"
+                      style={{ width: colMap('download')?.width || '12%' }}
+                    >
+                      {colMap('download')?.label || 'Download PDF'}
+                    </th>
+                  )}
+                </tr>
+              </thead>
 
-      {/* Published Paper Preview Modal */}
-      {isArticlePreviewOpen && previewArticle && (previewArticle.driveUrl || previewArticle.driveFileId) ? (
+              {/* Table Body */}
+              <tbody className="divide-y divide-stone-200/80 dark:divide-stone-800">
+                {filteredArticles.map((article, idx) => {
+                  const isEven = idx % 2 === 0;
+                  const rowBg = isEven
+                    ? config.tableDesign.rowBgColor || '#ffffff'
+                    : config.tableDesign.rowAltBgColor || '#f8fafc';
+                  const isAbstractExpanded = Boolean(expandedAbstracts[article.id]);
+
+                  const pageDisplay =
+                    article.pages ||
+                    (article.pageStart && article.pageEnd
+                      ? `${article.pageStart}–${article.pageEnd}`
+                      : article.pageStart || '—');
+
+                  return (
+                    <tr
+                      key={article.id}
+                      style={{ backgroundColor: rowBg }}
+                      className="transition-colors hover:bg-teal-50/40 dark:hover:bg-teal-950/20"
+                    >
+                      {/* S.No */}
+                      {colMap('serial')?.visible !== false && (
+                        <td className="py-3.5 px-3.5 font-mono font-bold text-center text-slate-800 dark:text-slate-200 align-top">
+                          {article.serialNumber || idx + 1}
+                        </td>
+                      )}
+
+                      {/* Author(s) Name */}
+                      {colMap('authors')?.visible !== false && (
+                        <td className="py-3.5 px-4 font-serif text-slate-800 dark:text-slate-200 align-top space-y-1">
+                          <div className="font-semibold leading-snug">
+                            {article.authors.map(a => a.name).join(', ')}
+                          </div>
+                          {article.authors[0]?.affiliation && (
+                            <div className="text-[11px] text-slate-500 font-sans italic line-clamp-2">
+                              {article.authors[0].affiliation}
+                            </div>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Paper Title, Track, DOI, and Abstract Toggle */}
+                      {colMap('title')?.visible !== false && (
+                        <td className="py-3.5 px-4 font-serif align-top space-y-1.5">
+                          <h3
+                            onClick={() => setSelectedArticleForView(article)}
+                            className="font-bold text-slate-900 dark:text-slate-100 hover:text-[#0d9488] dark:hover:text-teal-400 cursor-pointer transition-colors leading-snug"
+                          >
+                            {article.title}
+                          </h3>
+
+                          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                            {article.track && (
+                              <span className="text-[10px] font-sans px-2 py-0.5 rounded-full bg-teal-50 dark:bg-teal-950/50 text-[#0d9488] dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/60 font-semibold">
+                                {article.track}
+                              </span>
+                            )}
+                            {article.doi && <ArticleDoiBadge doi={article.doi} size="sm" />}
+                          </div>
+
+                          {/* Expandable Abstract Preview */}
+                          {article.abstract && (
+                            <div className="pt-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleAbstract(article.id)}
+                                className="text-[11px] text-slate-500 hover:text-[#0d9488] font-sans flex items-center gap-1 cursor-pointer"
+                              >
+                                <span>{isAbstractExpanded ? 'Hide Abstract' : 'View Abstract'}</span>
+                                {isAbstractExpanded ? (
+                                  <ChevronUp className="w-3 h-3" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3" />
+                                )}
+                              </button>
+                              <AnimatePresence>
+                                {isAbstractExpanded && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="mt-2 p-3 rounded-lg bg-stone-100 dark:bg-stone-800 text-[11px] text-slate-700 dark:text-slate-300 font-serif leading-relaxed border border-stone-200 dark:border-stone-700"
+                                  >
+                                    <p>{article.abstract}</p>
+                                    {article.keywords && article.keywords.length > 0 && (
+                                      <p className="mt-2 text-[10px] text-slate-500 font-sans">
+                                        <strong className="text-slate-700 dark:text-slate-300">Keywords:</strong>{' '}
+                                        {article.keywords.join(', ')}
+                                      </p>
+                                    )}
+                                  </motion.div>
+                                )}
+                              </AnimatePresence>
+                            </div>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Page Numbers */}
+                      {colMap('pages')?.visible !== false && (
+                        <td className="py-3.5 px-3.5 font-mono text-center text-slate-700 dark:text-slate-300 align-top whitespace-nowrap">
+                          {pageDisplay}
+                        </td>
+                      )}
+
+                      {/* Download PDF Button */}
+                      {colMap('download')?.visible !== false && (
+                        <td className="py-3.5 px-3.5 text-center align-top whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => downloadPublishedPaper(article)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0d9488] hover:bg-teal-700 text-white text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                            title={
+                              article.driveUrl
+                                ? `Open / Download authentic published PDF (${article.driveUrl})`
+                                : 'Download verified published paper (PDF)'
+                            }
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>PDF</span>
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* 5. FOOTER & DECORATIVE DIVIDERS */}
+      {config.footer.visible && (
+        <footer className="pt-4 pb-6 space-y-3">
+          {config.footer.showDecorativeLines && (
+            <div className="relative flex items-center justify-center">
+              <div className="w-full border-t border-stone-200 dark:border-stone-800" />
+              <div className="absolute px-3 bg-white dark:bg-stone-900 flex items-center gap-1 text-[#d97706]">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              </div>
+            </div>
+          )}
+
+          <div
+            className={`text-slate-500 font-serif ${
+              config.footer.fontSize === 'sm' ? 'text-sm' : 'text-xs'
+            } ${
+              config.footer.alignment === 'left'
+                ? 'text-left'
+                : config.footer.alignment === 'right'
+                ? 'text-right'
+                : 'text-center'
+            }`}
+            style={{ color: config.footer.textColor || '#64748b' }}
+          >
+            <p className="leading-relaxed">{config.footer.message}</p>
+            <p className="text-[10px] text-slate-400 mt-1 font-sans">
+              CC BY 4.0 Open Access License • Preserved in Global Permanent Digital Repositories
+            </p>
+          </div>
+        </footer>
+      )}
+
+      {/* MODALS */}
+      {previewCoverAsset && (
+        <DocumentPreviewModal
+          isOpen={isCoverPreviewOpen}
+          onClose={() => setIsCoverPreviewOpen(false)}
+          asset={previewCoverAsset}
+        />
+      )}
+
+      {previewArticle && (
         <GoogleDrivePreviewModal
           isOpen={isArticlePreviewOpen}
-          onClose={() => {
-            setIsArticlePreviewOpen(false);
-            setPreviewArticle(null);
-          }}
+          onClose={() => setIsArticlePreviewOpen(false)}
           title={previewArticle.title}
           authors={previewArticle.authors.map(a => a.name).join(', ')}
+          volumeInfo={`Vol. ${previewArticle.volume || activeVolume}, No. ${previewArticle.issue || activeIssue} (${previewArticle.year || activeYear})`}
           driveUrl={previewArticle.driveUrl}
-          driveFileId={previewArticle.driveFileId}
-          resourceType={previewArticle.driveResourceType as any}
-          volumeInfo={`Vol. ${previewArticle.volume || 7}, Issue ${previewArticle.issue || 1} (${previewArticle.year || 2026})`}
           doi={previewArticle.doi}
-          fileName={previewArticle.publishedFileName || `${previewArticle.trackingId}.pdf`}
-          onDownload={() => {
-            downloadPublishedPaper(previewArticle);
-          }}
-        />
-      ) : isArticlePreviewOpen && previewArticle && (
-        <DocumentPreviewModal
-          isOpen={isArticlePreviewOpen}
-          onClose={() => {
-            setIsArticlePreviewOpen(false);
-            setPreviewArticle(null);
-          }}
-          asset={{
-            id: previewArticle.id,
-            title: previewArticle.title,
-            description: `Vol. ${previewArticle.volume || 7}, Issue ${previewArticle.issue || 1} (${previewArticle.year || 2026}) • Track: ${previewArticle.track}`,
-            category: 'document',
-            fileName: previewArticle.publishedFileName || previewArticle.fileName || `${previewArticle.trackingId}.pdf`,
-            fileSize: previewArticle.publishedFileSize || previewArticle.fileSize || 'Standard Document',
-            fileType: previewArticle.publishedMimeType || previewArticle.mimeType || 'application/pdf',
-            storagePath: previewArticle.publishedStoragePath || previewArticle.storagePath,
-            downloadURL: previewArticle.publishedDownloadURL || previewArticle.downloadURL || previewArticle.publishedFileUrl || previewArticle.fileUrl,
-            fileDataUrl: previewArticle.publishedFileDataUrl || previewArticle.publishedDownloadURL || previewArticle.downloadURL || previewArticle.publishedFileUrl || previewArticle.fileUrl,
-            uploadedAt: previewArticle.publishedUploadedAt || previewArticle.publishedDate || previewArticle.submissionDate
-          }}
-          onDownload={() => {
-            downloadPublishedPaper(previewArticle);
-          }}
         />
       )}
     </div>

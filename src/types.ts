@@ -551,4 +551,92 @@ export interface SubjectTrack {
   updatedAt?: string;
 }
 
+export interface CurrentIssueTableColumn {
+  id: 'serial' | 'authors' | 'title' | 'pages' | 'download' | 'doi';
+  label: string;
+  visible: boolean;
+  width?: string;
+  align?: 'left' | 'center' | 'right';
+}
 
+export interface CurrentIssueHeaderConfig {
+  logoUrl?: string;
+  logoSize?: 'sm' | 'md' | 'lg' | 'xl';
+  logoAlignment?: 'left' | 'center';
+  abbreviation: string;
+  fullName: string;
+  tagline: string;
+  description: string;
+  issnOnline: string;
+  issnPrint: string;
+  headerBgColor: string;
+  headerTextColor: string;
+  headerSpacing: 'compact' | 'normal' | 'spacious';
+}
+
+export interface CurrentIssueDownloadsConfig {
+  frontPageLabel: string;
+  frontPageVisible: boolean;
+  frontPageBgColor: string;
+  frontPageTextColor: string;
+  frontPagePdfUrl?: string;
+
+  tocLabel: string;
+  tocVisible: boolean;
+  tocBgColor: string;
+  tocTextColor: string;
+  tocPdfUrl?: string;
+
+  certificatesLabel: string;
+  certificatesVisible: boolean;
+  certificatesBgColor: string;
+  certificatesTextColor: string;
+  certificatesPdfUrl?: string;
+
+  buttonAlignment: 'left' | 'center' | 'right';
+  buttonSize: 'sm' | 'md' | 'lg';
+}
+
+export interface CurrentIssueTableConfig {
+  columns: CurrentIssueTableColumn[];
+  headerBgColor: string;
+  headerTextColor: string;
+  rowBgColor: string;
+  rowAltBgColor: string;
+  borderColor: string;
+  fontSize: 'xs' | 'sm' | 'md';
+  fontFamily: 'serif' | 'sans';
+  cellPadding: 'compact' | 'normal' | 'relaxed';
+}
+
+export interface CurrentIssueFooterConfig {
+  message: string;
+  visible: boolean;
+  textColor: string;
+  fontSize: 'xs' | 'sm';
+  alignment: 'left' | 'center' | 'right';
+  showDecorativeLines: boolean;
+}
+
+export interface CurrentIssuePageAppearance {
+  bgColor: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  containerWidth: 'max-w-5xl' | 'max-w-6xl' | 'max-w-7xl';
+  spacing: 'compact' | 'normal' | 'relaxed';
+  emptyStateMessage: string;
+}
+
+export interface CurrentIssuePageConfig {
+  header: CurrentIssueHeaderConfig;
+  headingTitle: string;
+  showSubInfo: boolean;
+  downloads: CurrentIssueDownloadsConfig;
+  tableDesign: CurrentIssueTableConfig;
+  footer: CurrentIssueFooterConfig;
+  pageAppearance: CurrentIssuePageAppearance;
+  status: 'published' | 'draft';
+  lastUpdated?: string;
+  updatedBy?: string;
+}

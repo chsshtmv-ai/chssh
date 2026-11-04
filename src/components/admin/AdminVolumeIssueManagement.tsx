@@ -44,7 +44,8 @@ export const AdminVolumeIssueManagement: React.FC = () => {
     addArticleToIssue,
     removeArticleFromIssue,
     content,
-    setActiveTab
+    setActiveTab,
+    setAdminActiveSubTab
   } = useJournal();
 
   // Volume Form State
@@ -463,6 +464,18 @@ export const AdminVolumeIssueManagement: React.FC = () => {
                 >
                   <Eye className="w-4 h-4" />
                   <span>View on Public Site</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminActiveSubTab('current-issue');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0d9488] hover:bg-teal-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>Open Current Issue CMS</span>
                 </button>
 
                 {currentIssue ? (

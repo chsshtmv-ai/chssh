@@ -46,6 +46,7 @@ import { AdminPublicationSection } from './AdminPublicationSection';
 import { AdminGoogleDriveRegistrar } from './AdminGoogleDriveRegistrar';
 import { AdminGoogleDrivePaperUpload } from './AdminGoogleDrivePaperUpload';
 import { AdminVolumeIssueManagement } from './AdminVolumeIssueManagement';
+import { AdminCurrentIssueCms } from './AdminCurrentIssueCms';
 import { AdminManuscriptManagement } from './AdminManuscriptManagement';
 import { DocumentPreviewModal } from '../DocumentPreviewModal';
 import { triggerFileDownload } from '../../utils/downloadGenerators';
@@ -546,6 +547,19 @@ export const AdminPanel: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => setAdminActiveSubTab('current-issue')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer ${
+              adminActiveSubTab === 'current-issue'
+                ? 'bg-[#0d9488] text-white shadow-xs font-bold'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-stone-800'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>Current Issue Page CMS</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setAdminActiveSubTab('publication')}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer ${
               adminActiveSubTab === 'publication'
@@ -694,6 +708,9 @@ export const AdminPanel: React.FC = () => {
 
       {/* SUBTAB: Volume and Issue Management (Module 3 & 4) */}
       {adminActiveSubTab === 'volumes' && <AdminVolumeIssueManagement />}
+
+      {/* SUBTAB: Current Issue Page CMS */}
+      {adminActiveSubTab === 'current-issue' && <AdminCurrentIssueCms />}
 
       {/* SUBTAB: Typesetting & DOIs */}
       {adminActiveSubTab === 'publication' && <AdminPublicationSection />}
