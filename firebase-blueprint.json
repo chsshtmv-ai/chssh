@@ -142,6 +142,91 @@
         "contentSnapshot": { "type": "object" }
       },
       "required": ["id", "timestamp", "publishedBy", "summary"]
+    },
+    "Discipline": {
+      "title": "Discipline",
+      "description": "Academic disciplines managing journal subject areas and public filters",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "order", "isActive"]
+    },
+    "SubjectTrack": {
+      "title": "SubjectTrack",
+      "description": "Subject tracks available for manuscript submission and paper classification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "disciplineIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "order": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "disciplineIds", "order", "isActive"]
+    },
+    "JournalVolume": {
+      "title": "JournalVolume",
+      "description": "Volumes organizing annual journal publication cycles",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "volumeNumber": { "type": "number" },
+        "year": { "type": "number" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "coverImage": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "published", "archived"]
+        },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "volumeNumber", "year", "status"]
+    },
+    "JournalIssue": {
+      "title": "JournalIssue",
+      "description": "Journal issues containing peer-reviewed articles and featured as current or archived issues",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "volumeId": { "type": "string" },
+        "volumeNumber": { "type": "number" },
+        "issueNumber": { "type": "number" },
+        "year": { "type": "number" },
+        "title": { "type": "string" },
+        "publicationDate": { "type": "string" },
+        "coverImage": { "type": "string" },
+        "editorialPdfUrl": { "type": "string" },
+        "editorialPdfName": { "type": "string" },
+        "tableOfContentsSummary": { "type": "string" },
+        "articleIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "published", "archived"]
+        },
+        "isCurrent": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "volumeId", "volumeNumber", "issueNumber", "year", "title", "status", "isCurrent"]
     }
   },
   "firestore": {
@@ -180,6 +265,22 @@
     "/app_settings/{settingId}": {
       "schema": "JournalContent",
       "description": "System security and theme settings"
+    },
+    "/disciplines/{disciplineId}": {
+      "schema": "Discipline",
+      "description": "Academic disciplines and categories for the journal"
+    },
+    "/subject_tracks/{trackId}": {
+      "schema": "SubjectTrack",
+      "description": "Subject tracks and submission pathways mapped to disciplines"
+    },
+    "/journal_volumes/{volumeId}": {
+      "schema": "JournalVolume",
+      "description": "Journal volumes catalog"
+    },
+    "/journal_issues/{issueId}": {
+      "schema": "JournalIssue",
+      "description": "Journal publication issues catalog including live current issue designation"
     }
   }
 }

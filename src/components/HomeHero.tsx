@@ -24,7 +24,9 @@ export const HomeHero: React.FC = () => {
     setSelectedArticleForView,
     downloadPublishedPaper,
     activeContent,
-    content
+    content,
+    activeDisciplines,
+    subjectTracks
   } = useJournal();
   const currentContent = activeContent || content;
   const [selectedTrack, setSelectedTrack] = useState<string>('all');
@@ -95,39 +97,51 @@ export const HomeHero: React.FC = () => {
     return list;
   }, [publishedArticles, currentIssueRecord]);
 
+  // Dynamic Discipline tabs from database
   const tracks = React.useMemo(() => {
-    const defaultTracks = [
-      { id: 'all', label: 'All Disciplines' },
-      { id: 'Sociology & Social Theory', label: 'Sociology' },
-      { id: 'Cultural Studies & Critical Theory', label: 'Critical Theory' },
-      { id: 'Applied Ethics & Epistemic Justice', label: 'Ethics & Justice' },
-      { id: 'Digital Humanities & AI Ethics', label: 'Digital Humanities' },
-      { id: 'History, Memory & Archival Studies', label: 'History & Memory' }
-    ];
+    const list = [{ id: 'all', label: 'All Disciplines' }];
+    activeDisciplines.forEach((d) => {
+      list.push({ id: d.id, label: d.name });
+    });
+    return list;
+  }, [activeDisciplines]);
 
-    const extraTracks: { id: string; label: string }[] = [];
-    currentIssueArticles.forEach((art) => {
-      if (art.track && art.track.trim()) {
-        const exists = defaultTracks.some(
-          (t) => t.id.toLowerCase() === art.track.toLowerCase() || art.track.toLowerCase().includes(t.id.toLowerCase())
-        );
-        if (!exists && !extraTracks.some((t) => t.id === art.track)) {
-          extraTracks.push({ id: art.track, label: art.track });
+  // Fallback to 'all' if selectedTrack discipline was deactivated or deleted
+  React.useEffect(() => {
+    if (selectedTrack !== 'all' && !activeDisciplines.some((d) => d.id === selectedTrack)) {
+      setSelectedTrack('all');
+    }
+  }, [selectedTrack, activeDisciplines]);
+
+  const filteredArticles = React.useMemo(() => {
+    if (selectedTrack === 'all') return currentIssueArticles;
+    const selectedDisc = activeDisciplines.find((d) => d.id === selectedTrack);
+    const selNameLow = selectedDisc ? selectedDisc.name.toLowerCase().trim() : selectedTrack.toLowerCase().trim();
+
+    return currentIssueArticles.filter((a) => {
+      // 1. Explicit disciplineId match
+      if (a.disciplineId && a.disciplineId === selectedTrack) return true;
+      // 2. Explicit disciplineName match
+      if (a.disciplineName && a.disciplineName.toLowerCase().trim() === selNameLow) return true;
+      // 3. Track name matching discipline name directly
+      if (a.track) {
+        const artTrackLow = a.track.toLowerCase().trim();
+        if (artTrackLow === selNameLow || artTrackLow.includes(selNameLow) || selNameLow.includes(artTrackLow)) {
+          return true;
         }
       }
+      // 4. Track mapped to this discipline in subjectTracks
+      if (a.track) {
+        const foundTrack = subjectTracks.find(
+          (t) => t.id === a.trackId || t.name.toLowerCase().trim() === a.track.toLowerCase().trim()
+        );
+        if (foundTrack && foundTrack.disciplineIds && foundTrack.disciplineIds.includes(selectedTrack)) {
+          return true;
+        }
+      }
+      return false;
     });
-
-    return [...defaultTracks, ...extraTracks];
-  }, [currentIssueArticles]);
-
-  const filteredArticles = selectedTrack === 'all'
-    ? currentIssueArticles
-    : currentIssueArticles.filter((a) => {
-        if (!a.track) return false;
-        const trackLow = a.track.toLowerCase();
-        const selLow = selectedTrack.toLowerCase();
-        return trackLow.includes(selLow) || selLow.includes(trackLow);
-      });
+  }, [selectedTrack, currentIssueArticles, activeDisciplines, subjectTracks]);
 
   const displayedArticles = filteredArticles;
 

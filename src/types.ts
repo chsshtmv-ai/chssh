@@ -39,6 +39,9 @@ export interface Article {
   abstract: string;
   keywords: string[];
   track: string;
+  trackId?: string;
+  disciplineId?: string;
+  disciplineName?: string;
   authors: Author[];
   status: ArticleStatus;
   submissionDate: string;
@@ -93,6 +96,11 @@ export interface Article {
   // Publication Certificate Link (Google Drive)
   certificateUrl?: string;
   certificateUploadedAt?: string;
+  // Current Issue article ordering & details
+  serialNumber?: number;
+  pageStart?: string;
+  pageEnd?: string;
+  citation?: string;
 }
 
 export interface JournalVolume {
@@ -115,7 +123,15 @@ export interface JournalIssue {
   year: number;
   title: string;
   publicationDate: string;
+  publicationMonth?: string;
+  description?: string;
   coverImage?: string;
+  frontPagePdfUrl?: string;
+  frontPagePdfName?: string;
+  tocPdfUrl?: string;
+  tocPdfName?: string;
+  certificatesPdfUrl?: string;
+  certificatesPdfName?: string;
   editorialPdfUrl?: string;
   editorialPdfName?: string;
   tableOfContentsSummary?: string;
@@ -512,3 +528,27 @@ export interface CmsRevision {
   summary: string;
   contentSnapshot: JournalContent;
 }
+
+export interface Discipline {
+  id: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  order: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface SubjectTrack {
+  id: string;
+  name: string;
+  description?: string;
+  disciplineIds: string[];
+  order: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { JournalContent, Article, EditorialMember, AdvisoryBoardMember, ArticleStatus, JournalUploadedAsset, Reviewer, AuthorAccount, JournalPalette, JournalVolume, JournalIssue, CmsRevision } from '../types';
+import { JournalContent, Article, EditorialMember, AdvisoryBoardMember, ArticleStatus, JournalUploadedAsset, Reviewer, AuthorAccount, JournalPalette, JournalVolume, JournalIssue, CmsRevision, Discipline, SubjectTrack } from '../types';
 import { initialJournalContent } from '../data/defaultContent';
 import { initialArticles, initialEditorialBoard } from '../data/defaultArticles';
 import { initialAdvisoryBoard } from '../data/defaultAdvisoryBoard';
@@ -7,6 +7,8 @@ import { initialJournalAssets } from '../data/defaultAssets';
 import { initialReviewers } from '../data/defaultReviewers';
 import { initialAuthors, normalizePhoneNumber } from '../data/defaultAuthors';
 import { initialVolumes, initialIssues } from '../data/defaultVolumes';
+import { initialDisciplines } from '../data/defaultDisciplines';
+import { initialSubjectTracks } from '../data/defaultSubjectTracks';
 import { db, firebaseConfig, auth } from '../lib/firebase';
 import {
   collection,
@@ -110,8 +112,8 @@ interface JournalContextType {
   adminPassword: string;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper';
-  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper') => void;
+  adminActiveSubTab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper' | 'disciplines-tracks';
+  setAdminActiveSubTab: (tab: 'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper' | 'disciplines-tracks') => void;
   openAdminAssetUploader: () => void;
   selectedArticleForView: Article | null;
   setSelectedArticleForView: (article: Article | null) => void;
@@ -285,6 +287,7 @@ interface JournalContextType {
   deleteIssue: (id: string) => Promise<boolean>;
   publishIssue: (issueId: string) => Promise<{ success: boolean; error?: string }>;
   unpublishIssue: (issueId: string) => Promise<boolean>;
+  designateCurrentIssue: (issueId: string) => Promise<{ success: boolean; error?: string }>;
   reorderArticlesInIssue: (issueId: string, articleIds: string[]) => Promise<boolean>;
   addArticleToIssue: (issueId: string, articleId: string) => Promise<boolean>;
   removeArticleFromIssue: (issueId: string, articleId: string) => Promise<boolean>;
@@ -306,6 +309,19 @@ interface JournalContextType {
   isFirebaseSyncing: boolean;
   lastSyncedAt: Date | null;
   syncToFirebaseNow: () => Promise<boolean>;
+  // Disciplines & Subject Tracks Management
+  disciplines: Discipline[];
+  activeDisciplines: Discipline[];
+  subjectTracks: SubjectTrack[];
+  activeSubjectTracks: SubjectTrack[];
+  addDiscipline: (data: Omit<Discipline, 'id'>) => Promise<{ success: boolean; error?: string; id?: string }>;
+  updateDiscipline: (id: string, updates: Partial<Discipline>) => Promise<{ success: boolean; error?: string }>;
+  deleteDiscipline: (id: string) => Promise<{ success: boolean; error?: string }>;
+  reorderDisciplines: (newOrderList: { id: string; order: number }[]) => Promise<{ success: boolean; error?: string }>;
+  addSubjectTrack: (data: Omit<SubjectTrack, 'id'>) => Promise<{ success: boolean; error?: string; id?: string }>;
+  updateSubjectTrack: (id: string, updates: Partial<SubjectTrack>) => Promise<{ success: boolean; error?: string }>;
+  deleteSubjectTrack: (id: string) => Promise<{ success: boolean; error?: string }>;
+  reorderSubjectTracks: (newOrderList: { id: string; order: number }[]) => Promise<{ success: boolean; error?: string }>;
 }
 
 const JournalContext = createContext<JournalContextType | undefined>(undefined);
@@ -618,8 +634,42 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [isLiveEditMode, setIsLiveEditMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('home');
-  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper'>('submissions');
+  const [adminActiveSubTab, setAdminActiveSubTab] = useState<'submissions' | 'texts' | 'board' | 'advisory' | 'reviewers' | 'assets' | 'security' | 'downloads' | 'publication' | 'drive' | 'volumes' | 'drive-paper' | 'disciplines-tracks'>('submissions');
   const [selectedArticleForView, setSelectedArticleForView] = useState<Article | null>(null);
+
+  const [disciplines, setDisciplines] = useState<Discipline[]>(() => {
+    try {
+      const saved = localStorage.getItem('chssh_disciplines');
+      if (saved) {
+        const parsed: Discipline[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Error loading local disciplines', e);
+    }
+    return initialDisciplines;
+  });
+
+  const [subjectTracks, setSubjectTracks] = useState<SubjectTrack[]>(() => {
+    try {
+      const saved = localStorage.getItem('chssh_subject_tracks');
+      if (saved) {
+        const parsed: SubjectTrack[] = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.error('Error loading local subject tracks', e);
+    }
+    return initialSubjectTracks;
+  });
+
+  const activeDisciplines = React.useMemo(() => {
+    return disciplines.filter(d => d.isActive).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+  }, [disciplines]);
+
+  const activeSubjectTracks = React.useMemo(() => {
+    return subjectTracks.filter(t => t.isActive).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+  }, [subjectTracks]);
 
   const [volumes, setVolumes] = useState<JournalVolume[]>(() => {
     try {
@@ -631,7 +681,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {
       console.error('Error loading local volumes', e);
     }
-    return [];
+    return initialVolumes;
   });
 
   const [issues, setIssues] = useState<JournalIssue[]>(() => {
@@ -644,7 +694,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (e) {
       console.error('Error loading local issues', e);
     }
-    return [];
+    return initialIssues;
   });
 
   const openAdminAssetUploader = () => {
@@ -959,6 +1009,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let unsubscribeAuthors: (() => void) | undefined;
     let unsubscribeVolumes: (() => void) | undefined;
     let unsubscribeIssues: (() => void) | undefined;
+    let unsubscribeDisciplines: (() => void) | undefined;
+    let unsubscribeTracks: (() => void) | undefined;
 
     try {
       const contentDocRef = doc(db, 'journal_content', 'main');
@@ -1259,7 +1311,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             remoteVolumes.sort((a, b) => b.volumeNumber - a.volumeNumber);
             setVolumes(remoteVolumes);
           } else {
-            setVolumes([]);
+            setVolumes(initialVolumes);
           }
         },
         (error) => {
@@ -1282,11 +1334,75 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             });
             setIssues(remoteIssues);
           } else {
-            setIssues([]);
+            setIssues(initialIssues);
           }
         },
         (error) => {
           console.warn('Firestore journal_issues listener note:', error.message);
+        }
+      );
+
+      const disciplinesColRef = collection(db, 'disciplines');
+      unsubscribeDisciplines = onSnapshot(
+        disciplinesColRef,
+        async (snap) => {
+          if (!snap.empty) {
+            const remote: Discipline[] = [];
+            snap.forEach((docItem) => {
+              const d = docItem.data() as Discipline;
+              remote.push({ ...d, id: docItem.id || d.id });
+            });
+            remote.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+            setDisciplines(remote);
+            safeLocalStorageSet('chssh_disciplines', JSON.stringify(remote));
+          } else {
+            setDisciplines(initialDisciplines);
+            try {
+              const batch = writeBatch(db);
+              initialDisciplines.forEach((d) => {
+                const docRef = doc(db, 'disciplines', d.id);
+                batch.set(docRef, cleanForFirestore(d));
+              });
+              await batch.commit();
+            } catch (err) {
+              console.warn('Seeding initial disciplines:', err);
+            }
+          }
+        },
+        (error) => {
+          console.warn('Firestore disciplines listener note:', error.message);
+        }
+      );
+
+      const tracksColRef = collection(db, 'subject_tracks');
+      unsubscribeTracks = onSnapshot(
+        tracksColRef,
+        async (snap) => {
+          if (!snap.empty) {
+            const remote: SubjectTrack[] = [];
+            snap.forEach((docItem) => {
+              const t = docItem.data() as SubjectTrack;
+              remote.push({ ...t, id: docItem.id || t.id });
+            });
+            remote.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+            setSubjectTracks(remote);
+            safeLocalStorageSet('chssh_subject_tracks', JSON.stringify(remote));
+          } else {
+            setSubjectTracks(initialSubjectTracks);
+            try {
+              const batch = writeBatch(db);
+              initialSubjectTracks.forEach((t) => {
+                const docRef = doc(db, 'subject_tracks', t.id);
+                batch.set(docRef, cleanForFirestore(t));
+              });
+              await batch.commit();
+            } catch (err) {
+              console.warn('Seeding initial subject tracks:', err);
+            }
+          }
+        },
+        (error) => {
+          console.warn('Firestore subject tracks listener note:', error.message);
         }
       );
     } catch (e) {
@@ -1308,6 +1424,8 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (unsubscribeAuthors) unsubscribeAuthors();
       if (unsubscribeVolumes) unsubscribeVolumes();
       if (unsubscribeIssues) unsubscribeIssues();
+      if (unsubscribeDisciplines) unsubscribeDisciplines();
+      if (unsubscribeTracks) unsubscribeTracks();
     };
   }, []);
 
@@ -3323,6 +3441,49 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const designateCurrentIssue = async (issueId: string): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('designateCurrentIssue')) return { success: false, error: 'Unauthorized: Admin authentication required.' };
+    const target = issues.find(i => i.id === issueId);
+    if (!target) return { success: false, error: 'Issue not found' };
+
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+
+    const updatedIssues = issues.map(iss => {
+      if (iss.id === issueId) {
+        return {
+          ...iss,
+          status: 'published' as const,
+          isCurrent: true,
+          publicationDate: iss.publicationDate || today,
+          updatedAt: now
+        };
+      } else if (iss.isCurrent) {
+        return {
+          ...iss,
+          isCurrent: false,
+          updatedAt: now
+        };
+      }
+      return iss;
+    });
+
+    setIssues(updatedIssues);
+
+    try {
+      const batch = writeBatch(db);
+      updatedIssues.forEach(iss => {
+        const ref = doc(db, 'journal_issues', iss.id);
+        batch.set(ref, cleanForFirestore(iss), { merge: true });
+      });
+      await batch.commit();
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Firestore designateCurrentIssue error:', err);
+      return { success: false, error: err?.message || 'Failed to designate current issue' };
+    }
+  };
+
   const reorderArticlesInIssue = async (issueId: string, articleIds: string[]): Promise<boolean> => {
     if (!assertAdmin('reorderArticlesInIssue')) return false;
     const now = new Date().toISOString();
@@ -3469,6 +3630,298 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // ==========================================
+  // DISCIPLINE & SUBJECT TRACK CRUD OPERATIONS
+  // ==========================================
+
+  const addDiscipline = async (data: Omit<Discipline, 'id'>): Promise<{ success: boolean; error?: string; id?: string }> => {
+    if (!assertAdmin('addDiscipline')) return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    const id = `disc-${Date.now()}`;
+    const newDiscipline: Discipline = {
+      ...data,
+      id,
+      order: data.order ?? disciplines.length + 1,
+      isActive: data.isActive !== undefined ? data.isActive : true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setDisciplines(prev => {
+      const updated = [...prev, newDiscipline];
+      updated.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+      safeLocalStorageSet('chssh_disciplines', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      const docRef = doc(db, 'disciplines', id);
+      await setDoc(docRef, cleanForFirestore(newDiscipline));
+      return { success: true, id };
+    } catch (err: any) {
+      console.warn('Error adding discipline to Firestore:', err);
+      return { success: false, error: err.message || 'Failed to save discipline to Firestore.' };
+    }
+  };
+
+  const updateDiscipline = async (id: string, updates: Partial<Discipline>): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('updateDiscipline')) return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    const target = disciplines.find(d => d.id === id);
+    if (!target) return { success: false, error: 'Discipline not found.' };
+
+    const oldName = target.name;
+    const newName = updates.name?.trim();
+
+    const updatedDiscipline: Discipline = {
+      ...target,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    setDisciplines(prev => {
+      const updated = prev.map(d => (d.id === id ? updatedDiscipline : d));
+      updated.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+      safeLocalStorageSet('chssh_disciplines', JSON.stringify(updated));
+      return updated;
+    });
+
+    // If discipline was renamed, sync any articles explicitly referencing disciplineName
+    if (newName && newName !== oldName) {
+      setArticles(prev => prev.map(a => {
+        if (a.disciplineId === id || a.disciplineName === oldName) {
+          const updatedArt = { ...a, disciplineName: newName, disciplineId: id };
+          try {
+            const artRef = doc(db, 'articles', a.id);
+            updateDoc(artRef, { disciplineName: newName, disciplineId: id }).catch(e => console.warn(e));
+          } catch (e) {
+            console.warn(e);
+          }
+          return updatedArt;
+        }
+        return a;
+      }));
+    }
+
+    try {
+      const docRef = doc(db, 'disciplines', id);
+      await setDoc(docRef, cleanForFirestore(updatedDiscipline), { merge: true });
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error updating discipline in Firestore:', err);
+      return { success: false, error: err.message || 'Failed to update discipline in Firestore.' };
+    }
+  };
+
+  const deleteDiscipline = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('deleteDiscipline')) return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    const target = disciplines.find(d => d.id === id);
+    if (!target) return { success: false, error: 'Discipline not found.' };
+
+    const linkedTrackNames = subjectTracks
+      .filter(t => t.disciplineIds?.includes(id))
+      .map(t => t.name.toLowerCase());
+
+    const referencedArticles = articles.filter(a => {
+      if (a.disciplineId === id) return true;
+      if (a.disciplineName && a.disciplineName.toLowerCase() === target.name.toLowerCase()) return true;
+      if (a.track && (a.track.toLowerCase() === target.name.toLowerCase() || linkedTrackNames.includes(a.track.toLowerCase()))) return true;
+      return false;
+    });
+
+    if (referencedArticles.length > 0) {
+      return {
+        success: false,
+        error: `Cannot delete discipline "${target.name}": ${referencedArticles.length} existing manuscript(s)/article(s) reference this discipline or its associated subject tracks. Please deactivate the discipline instead so historical records are preserved, or reassign affected articles first.`
+      };
+    }
+
+    setDisciplines(prev => {
+      const updated = prev.filter(d => d.id !== id);
+      safeLocalStorageSet('chssh_disciplines', JSON.stringify(updated));
+      return updated;
+    });
+
+    // Unlink this discipline ID from any subject tracks
+    setSubjectTracks(prev => {
+      const updated = prev.map(t => ({
+        ...t,
+        disciplineIds: (t.disciplineIds || []).filter(dId => dId !== id)
+      }));
+      safeLocalStorageSet('chssh_subject_tracks', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      const docRef = doc(db, 'disciplines', id);
+      await deleteDoc(docRef);
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error deleting discipline from Firestore:', err);
+      return { success: false, error: err.message || 'Failed to delete discipline from Firestore.' };
+    }
+  };
+
+  const reorderDisciplines = async (newOrderList: { id: string; order: number }[]): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('reorderDisciplines')) return { success: false, error: 'Unauthorized.' };
+    const orderMap = new Map(newOrderList.map(item => [item.id, item.order]));
+
+    setDisciplines(prev => {
+      const updated = prev.map(d => ({
+        ...d,
+        order: orderMap.has(d.id) ? orderMap.get(d.id)! : d.order
+      }));
+      updated.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+      safeLocalStorageSet('chssh_disciplines', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      const batch = writeBatch(db);
+      newOrderList.forEach(item => {
+        const docRef = doc(db, 'disciplines', item.id);
+        batch.update(docRef, { order: item.order, updatedAt: new Date().toISOString() });
+      });
+      await batch.commit();
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error reordering disciplines in Firestore:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const addSubjectTrack = async (data: Omit<SubjectTrack, 'id'>): Promise<{ success: boolean; error?: string; id?: string }> => {
+    if (!assertAdmin('addSubjectTrack')) return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    const id = `track-${Date.now()}`;
+    const newTrack: SubjectTrack = {
+      ...data,
+      id,
+      order: data.order ?? subjectTracks.length + 1,
+      isActive: data.isActive !== undefined ? data.isActive : true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setSubjectTracks(prev => {
+      const updated = [...prev, newTrack];
+      updated.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+      safeLocalStorageSet('chssh_subject_tracks', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      const docRef = doc(db, 'subject_tracks', id);
+      await setDoc(docRef, cleanForFirestore(newTrack));
+      return { success: true, id };
+    } catch (err: any) {
+      console.warn('Error adding subject track to Firestore:', err);
+      return { success: false, error: err.message || 'Failed to save subject track to Firestore.' };
+    }
+  };
+
+  const updateSubjectTrack = async (id: string, updates: Partial<SubjectTrack>): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('updateSubjectTrack')) return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    const target = subjectTracks.find(t => t.id === id);
+    if (!target) return { success: false, error: 'Subject track not found.' };
+
+    const oldName = target.name;
+    const newName = updates.name?.trim();
+
+    const updatedTrack: SubjectTrack = {
+      ...target,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+
+    setSubjectTracks(prev => {
+      const updated = prev.map(t => (t.id === id ? updatedTrack : t));
+      updated.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+      safeLocalStorageSet('chssh_subject_tracks', JSON.stringify(updated));
+      return updated;
+    });
+
+    // If track name was changed, sync all articles referencing the old track name
+    if (newName && newName !== oldName) {
+      setArticles(prev => prev.map(a => {
+        if (a.track === oldName || a.trackId === id) {
+          const updatedArt = { ...a, track: newName, trackId: id };
+          try {
+            const artRef = doc(db, 'articles', a.id);
+            updateDoc(artRef, { track: newName, trackId: id }).catch(e => console.warn(e));
+          } catch (e) {
+            console.warn(e);
+          }
+          return updatedArt;
+        }
+        return a;
+      }));
+    }
+
+    try {
+      const docRef = doc(db, 'subject_tracks', id);
+      await setDoc(docRef, cleanForFirestore(updatedTrack), { merge: true });
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error updating subject track in Firestore:', err);
+      return { success: false, error: err.message || 'Failed to update subject track in Firestore.' };
+    }
+  };
+
+  const deleteSubjectTrack = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('deleteSubjectTrack')) return { success: false, error: 'Unauthorized: Admin privileges required.' };
+    const target = subjectTracks.find(t => t.id === id);
+    if (!target) return { success: false, error: 'Subject track not found.' };
+
+    const referencedArticles = articles.filter(a => a.trackId === id || a.track === target.name);
+    if (referencedArticles.length > 0) {
+      return {
+        success: false,
+        error: `Cannot delete subject track "${target.name}": ${referencedArticles.length} existing manuscript(s)/article(s) reference this track. Please deactivate the track instead so historical records are preserved, or reassign affected articles first.`
+      };
+    }
+
+    setSubjectTracks(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      safeLocalStorageSet('chssh_subject_tracks', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      const docRef = doc(db, 'subject_tracks', id);
+      await deleteDoc(docRef);
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error deleting subject track from Firestore:', err);
+      return { success: false, error: err.message || 'Failed to delete subject track from Firestore.' };
+    }
+  };
+
+  const reorderSubjectTracks = async (newOrderList: { id: string; order: number }[]): Promise<{ success: boolean; error?: string }> => {
+    if (!assertAdmin('reorderSubjectTracks')) return { success: false, error: 'Unauthorized.' };
+    const orderMap = new Map(newOrderList.map(item => [item.id, item.order]));
+
+    setSubjectTracks(prev => {
+      const updated = prev.map(t => ({
+        ...t,
+        order: orderMap.has(t.id) ? orderMap.get(t.id)! : t.order
+      }));
+      updated.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+      safeLocalStorageSet('chssh_subject_tracks', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      const batch = writeBatch(db);
+      newOrderList.forEach(item => {
+        const docRef = doc(db, 'subject_tracks', item.id);
+        batch.update(docRef, { order: item.order, updatedAt: new Date().toISOString() });
+      });
+      await batch.commit();
+      return { success: true };
+    } catch (err: any) {
+      console.warn('Error reordering subject tracks in Firestore:', err);
+      return { success: false, error: err.message };
+    }
   };
 
   const connectDrive = async (): Promise<{ success: boolean; error?: string }> => {
@@ -4137,6 +4590,7 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteIssue,
         publishIssue,
         unpublishIssue,
+        designateCurrentIssue,
         reorderArticlesInIssue,
         addArticleToIssue,
         removeArticleFromIssue,
@@ -4215,7 +4669,19 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         firebaseStatus,
         isFirebaseSyncing,
         lastSyncedAt,
-        syncToFirebaseNow
+        syncToFirebaseNow,
+        disciplines,
+        activeDisciplines,
+        subjectTracks,
+        activeSubjectTracks,
+        addDiscipline,
+        updateDiscipline,
+        deleteDiscipline,
+        reorderDisciplines,
+        addSubjectTrack,
+        updateSubjectTrack,
+        deleteSubjectTrack,
+        reorderSubjectTracks
       }}
     >
       {children}

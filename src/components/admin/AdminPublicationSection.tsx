@@ -56,7 +56,8 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
     downloadPublishedPaper,
     viewPublishedPaper,
     downloadOriginalManuscript,
-    setSelectedArticleForView
+    setSelectedArticleForView,
+    activeSubjectTracks
   } = useJournal();
 
   const [selectedArticleId, setSelectedArticleId] = useState<string>(
@@ -96,15 +97,17 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
 
   if (!isAdmin) return null;
 
-  // Tracks list
-  const tracks = [
-    'Sociology & Social Theory',
-    'Cultural Studies & Critical Theory',
-    'Applied Ethics & Epistemic Justice',
-    'History, Memory & Archival Studies',
-    'Political Philosophy & Global Governance',
-    'Digital Humanities & Computational Social Science'
-  ];
+  // Dynamic Tracks list
+  const tracks = activeSubjectTracks.length > 0
+    ? activeSubjectTracks.map((t) => t.name)
+    : [
+        'Sociology & Social Theory',
+        'Cultural Studies & Critical Theory',
+        'Applied Ethics & Epistemic Justice',
+        'History, Memory & Archival Studies',
+        'Political Philosophy & Global Governance',
+        'Digital Humanities & Computational Social Science'
+      ];
 
   // Sync form inputs when selectedArticleId or targetArticle changes
   useEffect(() => {

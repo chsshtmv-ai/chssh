@@ -40,7 +40,8 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
     updateArticle,
     content,
     setActiveTab,
-    downloadPublishedPaper
+    downloadPublishedPaper,
+    activeSubjectTracks
   } = useJournal();
 
   const [selectedArticleId, setSelectedArticleId] = useState<string>(
@@ -78,14 +79,16 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
   // Parse Drive URL in real-time
   const parsedDrive = parseGoogleDriveUrl(driveUrl);
 
-  const tracks = [
-    'Sociology & Social Theory',
-    'Cultural Studies & Critical Theory',
-    'Applied Ethics & Epistemic Justice',
-    'History, Memory & Archival Studies',
-    'Political Philosophy & Global Governance',
-    'Digital Humanities & Computational Social Science'
-  ];
+  const tracks = activeSubjectTracks.length > 0
+    ? activeSubjectTracks.map((t) => t.name)
+    : [
+        'Sociology & Social Theory',
+        'Cultural Studies & Critical Theory',
+        'Applied Ethics & Epistemic Justice',
+        'History, Memory & Archival Studies',
+        'Political Philosophy & Global Governance',
+        'Digital Humanities & Computational Social Science'
+      ];
 
   // Pre-fill form when target article changes
   useEffect(() => {
@@ -199,6 +202,8 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
           isCorresponding: true
         }],
         track,
+        trackId: activeSubjectTracks.find(t => t.name === track)?.id,
+        disciplineId: activeSubjectTracks.find(t => t.name === track)?.disciplineIds?.[0],
         volume: Number(volume) || 7,
         issue: Number(issue) || 1,
         year: Number(year) || 2026,

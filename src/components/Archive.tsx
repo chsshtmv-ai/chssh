@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useJournal } from '../context/JournalContext';
 import { EditableText } from './EditableText';
 import { ArticleDoiBadge } from './ArticleDoiBadge';
@@ -31,7 +31,9 @@ export const Archive: React.FC = () => {
     volumes,
     setSelectedArticleForView,
     requireAuthorAuth,
-    downloadPublishedPaper
+    downloadPublishedPaper,
+    activeDisciplines,
+    subjectTracks
   } = useJournal();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,15 +58,20 @@ export const Archive: React.FC = () => {
     return expandedIssues[issueId] !== false; // default true
   };
 
-  const tracks = [
-    'all',
-    'Sociology & Social Theory',
-    'Cultural Studies & Critical Theory',
-    'Applied Ethics & Epistemic Justice',
-    'History, Memory & Archival Studies',
-    'Political Philosophy & Global Governance',
-    'Digital Humanities & Computational Social Science'
-  ];
+  // Dynamic Disciplines from Firestore
+  const disciplineFilters = useMemo(() => {
+    const list = [{ id: 'all', label: 'All Disciplines' }];
+    activeDisciplines.forEach(d => {
+      list.push({ id: d.id, label: d.name });
+    });
+    return list;
+  }, [activeDisciplines]);
+
+  useEffect(() => {
+    if (selectedTrack !== 'all' && !activeDisciplines.some(d => d.id === selectedTrack)) {
+      setSelectedTrack('all');
+    }
+  }, [selectedTrack, activeDisciplines]);
 
   const publishedArticles = useMemo(() => {
     return articles.filter((a) => a.status === 'published');
@@ -181,9 +188,28 @@ export const Archive: React.FC = () => {
             }
           }
 
-          // Apply track filter
+          // Apply discipline filter
           if (selectedTrack !== 'all') {
-            matchedArticles = matchedArticles.filter(a => a.track === selectedTrack);
+            const selectedDisc = activeDisciplines.find((d) => d.id === selectedTrack);
+            const selNameLow = selectedDisc ? selectedDisc.name.toLowerCase().trim() : selectedTrack.toLowerCase().trim();
+
+            matchedArticles = matchedArticles.filter((a) => {
+              if (a.disciplineId && a.disciplineId === selectedTrack) return true;
+              if (a.disciplineName && a.disciplineName.toLowerCase().trim() === selNameLow) return true;
+              if (a.track) {
+                const artTrackLow = a.track.toLowerCase().trim();
+                if (artTrackLow === selNameLow || artTrackLow.includes(selNameLow) || selNameLow.includes(artTrackLow)) {
+                  return true;
+                }
+                const foundTrack = subjectTracks.find(
+                  (t) => t.id === a.trackId || t.name.toLowerCase().trim() === artTrackLow
+                );
+                if (foundTrack && foundTrack.disciplineIds && foundTrack.disciplineIds.includes(selectedTrack)) {
+                  return true;
+                }
+              }
+              return false;
+            });
           }
 
           // Apply search term filter
@@ -343,21 +369,21 @@ export const Archive: React.FC = () => {
           </div>
         </div>
 
-        {/* Track Filter Filter Tag Bar */}
+        {/* Dynamic Discipline Filter Tag Bar */}
         <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800 text-xs">
-          <span className="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Filter by Track:</span>
-          {tracks.map(t => (
+          <span className="text-slate-500 font-semibold uppercase tracking-wider text-[10px]">Filter by Discipline:</span>
+          {disciplineFilters.map((df) => (
             <button
-              key={t}
+              key={df.id}
               type="button"
-              onClick={() => setSelectedTrack(t)}
+              onClick={() => setSelectedTrack(df.id)}
               className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
-                selectedTrack === t
-                  ? 'bg-amber-800 text-white shadow-2xs'
+                selectedTrack === df.id
+                  ? 'bg-amber-800 text-white shadow-2xs font-semibold'
                   : 'bg-stone-100 dark:bg-stone-800 text-slate-600 dark:text-slate-300 hover:bg-stone-200 dark:hover:bg-stone-700'
               }`}
             >
-              {t === 'all' ? 'All Disciplines' : t}
+              {df.label}
             </button>
           ))}
         </div>

@@ -19,7 +19,8 @@ import {
   BookOpen,
   Loader2,
   ExternalLink,
-  Clock
+  Clock,
+  FileText
 } from 'lucide-react';
 
 export const CurrentIssue: React.FC = () => {
@@ -252,6 +253,20 @@ export const CurrentIssue: React.FC = () => {
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-serif leading-relaxed">
                 {currentIssueRecord.tableOfContentsSummary}
               </p>
+            )}
+            {currentIssueRecord.editorialPdfUrl && (
+              <div className="pt-1">
+                <a
+                  href={currentIssueRecord.editorialPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-800 dark:text-sky-300 text-xs font-semibold hover:bg-sky-100 dark:hover:bg-sky-900/50 transition cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                  <span>{currentIssueRecord.editorialPdfName || 'Editorial Remarks & Introduction (PDF)'}</span>
+                  <ExternalLink className="w-3 h-3 opacity-70 ml-0.5" />
+                </a>
+              </div>
             )}
           </div>
 

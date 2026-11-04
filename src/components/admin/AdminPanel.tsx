@@ -34,9 +34,11 @@ import {
   Globe,
   Send,
   FolderOpen,
-  Layers
+  Layers,
+  Compass
 } from 'lucide-react';
 import { AdminEditorialBoard } from './AdminEditorialBoard';
+import { AdminDisciplineTrackManagement } from './AdminDisciplineTrackManagement';
 import { AdminAdvisoryBoard } from './AdminAdvisoryBoard';
 import { AdminReviewersPanel } from './AdminReviewersPanel';
 import { AdminManuscriptDownloads } from './AdminManuscriptDownloads';
@@ -570,6 +572,19 @@ export const AdminPanel: React.FC = () => {
 
           <button
             type="button"
+            onClick={() => setAdminActiveSubTab('disciplines-tracks')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer ${
+              adminActiveSubTab === 'disciplines-tracks'
+                ? 'bg-[#102344] text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-stone-800'
+            }`}
+          >
+            <Compass className="w-3.5 h-3.5 text-sky-400" />
+            <span>Discipline &amp; Subject Track Management</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setAdminActiveSubTab('board')}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-lg transition-colors cursor-pointer ${
               adminActiveSubTab === 'board'
@@ -759,6 +774,9 @@ export const AdminPanel: React.FC = () => {
           {cmsActiveSection === 'other' && <AdminOtherPagesManager />}
         </div>
       )}
+
+      {/* SUBTAB: Discipline & Subject Track Management */}
+      {adminActiveSubTab === 'disciplines-tracks' && <AdminDisciplineTrackManagement />}
 
       {/* SUBTAB: Editorial Board */}
       {adminActiveSubTab === 'board' && (

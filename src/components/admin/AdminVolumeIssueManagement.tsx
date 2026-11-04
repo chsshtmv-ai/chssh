@@ -39,6 +39,7 @@ export const AdminVolumeIssueManagement: React.FC = () => {
     deleteIssue,
     publishIssue,
     unpublishIssue,
+    designateCurrentIssue,
     reorderArticlesInIssue,
     addArticleToIssue,
     removeArticleFromIssue,
@@ -69,6 +70,7 @@ export const AdminVolumeIssueManagement: React.FC = () => {
   const [issueEditorialPdfUrl, setIssueEditorialPdfUrl] = useState('');
   const [issueEditorialPdfName, setIssueEditorialPdfName] = useState('');
   const [issueStatus, setIssueStatus] = useState<'draft' | 'published' | 'archived'>('draft');
+  const [isCurrentIssueCheck, setIsCurrentIssueCheck] = useState<boolean>(false);
   const [issueError, setIssueError] = useState<string | null>(null);
 
   // Issue Article Selector State
@@ -181,6 +183,7 @@ export const AdminVolumeIssueManagement: React.FC = () => {
     setIssueEditorialPdfUrl('');
     setIssueEditorialPdfName('');
     setIssueStatus('draft');
+    setIsCurrentIssueCheck(false);
     setIssueError(null);
     setIsIssueModalOpen(true);
   };
@@ -198,6 +201,7 @@ export const AdminVolumeIssueManagement: React.FC = () => {
     setIssueEditorialPdfUrl(iss.editorialPdfUrl || '');
     setIssueEditorialPdfName(iss.editorialPdfName || '');
     setIssueStatus(iss.status);
+    setIsCurrentIssueCheck(Boolean(iss.isCurrent));
     setIssueError(null);
     setIsIssueModalOpen(true);
   };
@@ -221,9 +225,12 @@ export const AdminVolumeIssueManagement: React.FC = () => {
         coverImage: issueCoverImage.trim() || undefined,
         editorialPdfUrl: issueEditorialPdfUrl.trim() || undefined,
         editorialPdfName: issueEditorialPdfName.trim() || undefined,
-        status: issueStatus
+        status: isCurrentIssueCheck ? 'published' : issueStatus
       });
       if (ok) {
+        if (isCurrentIssueCheck && !editingIssue.isCurrent) {
+          await designateCurrentIssue(editingIssue.id);
+        }
         showNotification(`Volume ${volNum}, Issue ${issueNumber} updated successfully.`);
         setIsIssueModalOpen(false);
       } else {
@@ -242,10 +249,13 @@ export const AdminVolumeIssueManagement: React.FC = () => {
         editorialPdfUrl: issueEditorialPdfUrl.trim() || undefined,
         editorialPdfName: issueEditorialPdfName.trim() || undefined,
         articleIds: [],
-        status: issueStatus,
-        isCurrent: false
+        status: isCurrentIssueCheck ? 'published' : issueStatus,
+        isCurrent: isCurrentIssueCheck
       });
-      if (res.success) {
+      if (res.success && res.issue) {
+        if (isCurrentIssueCheck) {
+          await designateCurrentIssue(res.issue.id);
+        }
         showNotification(`Volume ${volNum}, Issue ${issueNumber} created successfully.`);
         setIsIssueModalOpen(false);
       } else {
@@ -373,6 +383,150 @@ export const AdminVolumeIssueManagement: React.FC = () => {
           </motion.div>
         )}
       </div>
+
+      {/* ACTIVE CURRENT ISSUE SPOTLIGHT & CONTROLLER CARD */}
+      {(() => {
+        const currentIssue =
+          issues.find(i => i.isCurrent && (i.status === 'published' || !i.status)) ||
+          issues.find(i => i.isCurrent) ||
+          issues.find(i => i.status === 'published');
+
+        return (
+          <div className="bg-linear-to-br from-[#102344] via-[#162f5c] to-[#1c3a6e] text-white rounded-2xl p-6 sm:p-7 shadow-md border border-sky-900/40 relative overflow-hidden">
+            <div className="absolute top-0 right-0 -mr-10 -mt-10 w-48 h-48 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-3 max-w-3xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-3 py-1 text-[11px] font-bold rounded-full bg-emerald-500 text-white shadow-xs tracking-wider uppercase flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Live Current Issue</span>
+                  </span>
+                  {currentIssue ? (
+                    <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-white/15 text-slate-200">
+                      Vol. {currentIssue.volumeNumber}, No. {currentIssue.issueNumber} ({currentIssue.year})
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-500/20 text-amber-200">
+                      No Issue Designated
+                    </span>
+                  )}
+                  {currentIssue?.publicationDate && (
+                    <span className="text-xs text-sky-200/80 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Published {currentIssue.publicationDate}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-lg sm:text-xl font-serif font-bold text-white leading-snug">
+                    {currentIssue?.title || 'No current issue published yet'}
+                  </h3>
+                  {currentIssue?.tableOfContentsSummary && (
+                    <p className="text-xs sm:text-sm text-sky-100/80 font-serif line-clamp-2 mt-1.5 leading-relaxed">
+                      {currentIssue.tableOfContentsSummary}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 text-xs text-sky-200/90 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-sky-400" />
+                    <span>
+                      <strong className="text-white font-mono">{currentIssue?.articleIds?.length || 0}</strong> Articles in Table of Contents
+                    </span>
+                  </div>
+                  {currentIssue?.coverImage && (
+                    <div className="flex items-center gap-1 text-emerald-300">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Custom Cover Set</span>
+                    </div>
+                  )}
+                  {currentIssue?.editorialPdfUrl && (
+                    <div className="flex items-center gap-1 text-amber-300">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Editorial PDF Linked</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Controls for Current Issue */}
+              <div className="flex flex-col sm:flex-row lg:flex-col gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('current');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>View on Public Site</span>
+                </button>
+
+                {currentIssue ? (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditIssue(currentIssue)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer border border-white/15"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>Edit Current Issue Details</span>
+                  </button>
+                ) : (
+                  issues.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const first = issues[0];
+                        const res = await designateCurrentIssue(first.id);
+                        if (res.success) {
+                          showNotification(`Volume ${first.volumeNumber}, Issue ${first.issueNumber} set as Current Issue!`);
+                        }
+                      }}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Set First Issue as Current</span>
+                    </button>
+                  )
+                )}
+
+                {/* Quick Designate Switcher */}
+                {issues.length > 1 && (
+                  <div className="pt-1">
+                    <label className="block text-[10px] font-semibold text-sky-200/70 uppercase tracking-wider mb-1">
+                      Quick Switch Current Issue:
+                    </label>
+                    <select
+                      value={currentIssue?.id || ''}
+                      onChange={async (e) => {
+                        const targetId = e.target.value;
+                        if (!targetId || targetId === currentIssue?.id) return;
+                        const res = await designateCurrentIssue(targetId);
+                        if (res.success) {
+                          const chosen = issues.find(i => i.id === targetId);
+                          showNotification(`Volume ${chosen?.volumeNumber}, Issue ${chosen?.issueNumber} is now set as the active Current Issue!`);
+                        } else {
+                          alert(res.error || 'Failed to switch current issue.');
+                        }
+                      }}
+                      className="w-full px-3 py-1.5 text-xs bg-[#0b172e] border border-sky-700/60 text-slate-100 rounded-lg outline-none cursor-pointer focus:ring-1 focus:ring-amber-400"
+                    >
+                      {issues.map(iss => (
+                        <option key={iss.id} value={iss.id}>
+                          Vol. {iss.volumeNumber}, No. {iss.issueNumber} ({iss.year}) - {iss.title.substring(0, 35)}...
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Volumes & Nested Issues List */}
       <div className="space-y-6">
@@ -974,19 +1128,71 @@ export const AdminVolumeIssueManagement: React.FC = () => {
                   />
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                      Editorial PDF Link (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={issueEditorialPdfUrl}
+                      onChange={(e) => setIssueEditorialPdfUrl(e.target.value)}
+                      placeholder="Google Drive URL or file link"
+                      className="w-full px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                      Editorial PDF Document Name
+                    </label>
+                    <input
+                      type="text"
+                      value={issueEditorialPdfName}
+                      onChange={(e) => setIssueEditorialPdfName(e.target.value)}
+                      placeholder="e.g. Editorial_Remarks_Issue1.pdf"
+                      className="w-full px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                {/* Live Current Issue Designation Toggle */}
+                <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="isCurrentIssueToggle"
+                    checked={isCurrentIssueCheck}
+                    onChange={(e) => setIsCurrentIssueCheck(e.target.checked)}
+                    className="mt-0.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                  <label htmlFor="isCurrentIssueToggle" className="cursor-pointer">
+                    <span className="block font-semibold text-slate-800 dark:text-slate-200">
+                      Designate as Live Current Issue
+                    </span>
+                    <span className="block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Promotes this issue to the primary Current Issue page on the public website and automatically sets its status to Published.
+                    </span>
+                  </label>
+                </div>
+
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                    Initial Publication Status
+                    Publication Status
                   </label>
                   <select
-                    value={issueStatus}
+                    value={isCurrentIssueCheck ? 'published' : issueStatus}
+                    disabled={isCurrentIssueCheck}
                     onChange={(e) => setIssueStatus(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
+                    className="w-full px-3 py-2 rounded-lg border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100 disabled:opacity-60"
                   >
                     <option value="draft">Draft (Work in progress)</option>
                     <option value="published">Published</option>
                     <option value="archived">Archived</option>
                   </select>
+                  {isCurrentIssueCheck && (
+                    <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                      Status is automatically set to "Published" when designated as the Live Current Issue.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-200 dark:border-stone-800">

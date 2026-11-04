@@ -24,23 +24,15 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { detectDocumentFormat } from '../utils/documentHelpers';
 
-const ACADEMIC_TRACKS = [
-  'Political Economy & Global Governance',
-  'Cultural Studies & Critical Theory',
-  'Digital Humanities & AI Ethics',
-  'Sociology of Labor & Social Movements',
-  'Environmental Ethics & Spatial Justice',
-  'Media Ecology & Public Discourse',
-  'Philosophy of Mind & Cognitive Epistemology'
-];
-
 export const SubmitManuscript: React.FC = () => {
   const {
     submitManuscript,
     setActiveTab,
     currentAuthor,
     isAuthorLoggedIn,
-    openAuthorAuthModal
+    openAuthorAuthModal,
+    activeSubjectTracks,
+    disciplines
   } = useJournal();
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -50,7 +42,16 @@ export const SubmitManuscript: React.FC = () => {
   // Form State - Step 1: Metadata
   const [title, setTitle] = useState('');
   const [abstract, setAbstract] = useState('');
-  const [track, setTrack] = useState(ACADEMIC_TRACKS[0]);
+  const [track, setTrack] = useState(activeSubjectTracks[0]?.name || 'Sociology & Social Theory');
+
+  // Keep track synced if activeSubjectTracks loads asynchronously
+  useEffect(() => {
+    if (activeSubjectTracks.length > 0) {
+      if (!track || !activeSubjectTracks.some((t) => t.name === track)) {
+        setTrack(activeSubjectTracks[0].name);
+      }
+    }
+  }, [activeSubjectTracks, track]);
   const [keywordInput, setKeywordInput] = useState('');
   const [keywords, setKeywords] = useState<string[]>(['Social Theory', 'Critical Policy']);
 
@@ -383,11 +384,17 @@ export const SubmitManuscript: React.FC = () => {
                   onChange={(e) => setTrack(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
                 >
-                  {ACADEMIC_TRACKS.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
+                  {activeSubjectTracks.map((t) => {
+                    const assignedDisciplines = disciplines
+                      .filter((d) => t.disciplineIds?.includes(d.id))
+                      .map((d) => d.name)
+                      .join(', ');
+                    return (
+                      <option key={t.id} value={t.name}>
+                        {t.name}{assignedDisciplines ? ` — [${assignedDisciplines}]` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

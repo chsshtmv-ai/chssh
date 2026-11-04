@@ -27,9 +27,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Journal content document: public read for published content ('main'), draft strictly restricted to chsshtmv@gmail.com
+    // Journal content document: public read for published content ('main', 'assets', 'current_issue'), draft strictly restricted to chsshtmv@gmail.com
     match /journal_content/{contentId} {
-      allow read: if contentId == 'main' || contentId == 'assets' || isChsshAdmin();
+      allow read: if contentId == 'main' || contentId == 'assets' || contentId == 'current_issue' || isChsshAdmin();
       allow write: if isChsshAdmin();
     }
 
@@ -102,6 +102,18 @@ service cloud.firestore {
 
     // App settings: security, SMS gateway, theme (write strictly restricted to chsshtmv@gmail.com)
     match /app_settings/{settingId} {
+      allow read: if true;
+      allow write: if isChsshAdmin();
+    }
+
+    // Disciplines: public read for active categories and filters, write strictly restricted to chsshtmv@gmail.com
+    match /disciplines/{disciplineId} {
+      allow read: if true;
+      allow write: if isChsshAdmin();
+    }
+
+    // Subject Tracks: public read for manuscript submission and categorization, write strictly restricted to chsshtmv@gmail.com
+    match /subject_tracks/{trackId} {
       allow read: if true;
       allow write: if isChsshAdmin();
     }

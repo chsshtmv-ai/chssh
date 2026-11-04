@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getInitials, getAvatarColor } from '../utils/imageUtils';
 
 export const ReviewersView: React.FC = () => {
-  const { reviewers, applyReviewer, content } = useJournal();
+  const { reviewers, applyReviewer, content, activeSubjectTracks } = useJournal();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTrack, setSelectedTrack] = useState<string>('all');
   const [showApplyModal, setShowApplyModal] = useState(false);
@@ -421,12 +421,18 @@ export const ReviewersView: React.FC = () => {
                         onChange={(e) => setForm({ ...form, track: e.target.value })}
                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
                       >
-                        <option value="Political Economy & Global Governance">Political Economy &amp; Global Governance</option>
-                        <option value="Cultural Studies & Critical Theory">Cultural Studies &amp; Critical Theory</option>
-                        <option value="Digital Humanities & AI Ethics">Digital Humanities &amp; AI Ethics</option>
-                        <option value="Sociology of Labor & Social Movements">Sociology of Labor &amp; Social Movements</option>
-                        <option value="Environmental Ethics & Spatial Justice">Environmental Ethics &amp; Spatial Justice</option>
-                        <option value="Media Ecology & Public Discourse">Media Ecology &amp; Public Discourse</option>
+                        {(activeSubjectTracks.length > 0 ? activeSubjectTracks : [
+                          { id: 't1', name: 'Sociology & Social Theory' },
+                          { id: 't2', name: 'Cultural Studies & Critical Theory' },
+                          { id: 't3', name: 'Digital Humanities & AI Ethics' },
+                          { id: 't4', name: 'Sociology of Labor & Social Movements' },
+                          { id: 't5', name: 'Environmental Ethics & Spatial Justice' },
+                          { id: 't6', name: 'Media Ecology & Public Discourse' }
+                        ]).map((t) => (
+                          <option key={t.id} value={t.name}>
+                            {t.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     <div>
