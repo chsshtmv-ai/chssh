@@ -421,14 +421,7 @@ export const ReviewersView: React.FC = () => {
                         onChange={(e) => setForm({ ...form, track: e.target.value })}
                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-slate-900 dark:text-slate-100"
                       >
-                        {(activeSubjectTracks.length > 0 ? activeSubjectTracks : [
-                          { id: 't1', name: 'Sociology & Social Theory' },
-                          { id: 't2', name: 'Cultural Studies & Critical Theory' },
-                          { id: 't3', name: 'Digital Humanities & AI Ethics' },
-                          { id: 't4', name: 'Sociology of Labor & Social Movements' },
-                          { id: 't5', name: 'Environmental Ethics & Spatial Justice' },
-                          { id: 't6', name: 'Media Ecology & Public Discourse' }
-                        ]).map((t) => (
+                        {activeSubjectTracks.map((t) => (
                           <option key={t.id} value={t.name}>
                             {t.name}
                           </option>

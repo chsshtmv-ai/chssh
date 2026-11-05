@@ -706,13 +706,7 @@ export const AdminReviewersPanel: React.FC<AdminReviewersPanelProps> = ({
                     onChange={(e) => setEditingReviewer({ ...editingReviewer, track: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg outline-none focus:ring-2 focus:ring-[#1c355e]"
                   >
-                    {(activeSubjectTracks.length > 0 ? activeSubjectTracks : [
-                      { id: 't1', name: 'Sociology & Social Theory' },
-                      { id: 't2', name: 'Cultural Studies & Critical Theory' },
-                      { id: 't3', name: 'Applied Ethics & Epistemic Justice' },
-                      { id: 't4', name: 'Digital Humanities & Computational Social Science' },
-                      { id: 't5', name: 'History, Memory & Archival Studies' }
-                    ]).map((t) => (
+                    {activeSubjectTracks.map((t) => (
                       <option key={t.id} value={t.name}>
                         {t.name}
                       </option>
@@ -909,13 +903,7 @@ export const AdminReviewersPanel: React.FC<AdminReviewersPanelProps> = ({
                     onChange={(e) => setNewReviewer({ ...newReviewer, track: e.target.value })}
                     className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-850 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-lg outline-none focus:ring-2 focus:ring-[#1c355e]"
                   >
-                    {(activeSubjectTracks.length > 0 ? activeSubjectTracks : [
-                      { id: 't1', name: 'Sociology & Social Theory' },
-                      { id: 't2', name: 'Cultural Studies & Critical Theory' },
-                      { id: 't3', name: 'Applied Ethics & Epistemic Justice' },
-                      { id: 't4', name: 'Digital Humanities & Computational Social Science' },
-                      { id: 't5', name: 'History, Memory & Archival Studies' }
-                    ]).map((t) => (
+                    {activeSubjectTracks.map((t) => (
                       <option key={t.id} value={t.name}>
                         {t.name}
                       </option>

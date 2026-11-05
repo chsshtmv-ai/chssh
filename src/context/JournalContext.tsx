@@ -170,6 +170,9 @@ interface JournalContextType {
     abstract: string;
     keywords: string[];
     track: string;
+    trackId?: string;
+    disciplineId?: string;
+    disciplineName?: string;
     authors: Article['authors'];
     fileName?: string;
     fileSize?: string;
@@ -222,6 +225,9 @@ interface JournalContextType {
     abstract: string;
     keywords: string[];
     track: string;
+    trackId?: string;
+    disciplineId?: string;
+    disciplineName?: string;
     volume: number;
     issue: number;
     year: number;
@@ -2235,6 +2241,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     abstract: string;
     keywords: string[];
     track: string;
+    trackId?: string;
+    disciplineId?: string;
+    disciplineName?: string;
     authors: Article['authors'];
     fileName?: string;
     fileSize?: string;
@@ -2254,6 +2263,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       abstract: data.abstract,
       keywords: data.keywords,
       track: data.track,
+      trackId: data.trackId,
+      disciplineId: data.disciplineId,
+      disciplineName: data.disciplineName,
       authors: data.authors,
       status: 'submitted',
       submissionDate: today,
@@ -2538,6 +2550,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         abstract: metadata?.abstract || 'Published research paper in Contemporary Horizons in Social Sciences and Humanities.',
         keywords: metadata?.keywords || ['Social Sciences', 'Humanities', 'Peer Reviewed'],
         track: metadata?.track || 'Sociology & Social Theory',
+        trackId: metadata?.trackId,
+        disciplineId: metadata?.disciplineId,
+        disciplineName: metadata?.disciplineName,
         authors: metadata?.authors && metadata.authors.length > 0 ? metadata.authors : [{
           id: `auth_${Date.now()}`,
           name: 'Author Name',
@@ -2627,6 +2642,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             ...(metadata?.pages ? { pages: metadata.pages } : {}),
             ...(metadata?.doi ? { doi: metadata.doi } : {}),
             ...(metadata?.track ? { track: metadata.track } : {}),
+            ...(metadata?.trackId !== undefined ? { trackId: metadata.trackId } : {}),
+            ...(metadata?.disciplineId !== undefined ? { disciplineId: metadata.disciplineId } : {}),
+            ...(metadata?.disciplineName !== undefined ? { disciplineName: metadata.disciplineName } : {}),
             ...(metadata?.certificateUrl !== undefined ? { certificateUrl: metadata.certificateUrl } : {})
           };
           resultingArticle = updated;
@@ -2657,6 +2675,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
               ...(metadata?.pages ? { pages: metadata.pages } : {}),
               ...(metadata?.doi ? { doi: metadata.doi } : {}),
               ...(metadata?.track ? { track: metadata.track } : {}),
+              ...(metadata?.trackId !== undefined ? { trackId: metadata.trackId } : {}),
+              ...(metadata?.disciplineId !== undefined ? { disciplineId: metadata.disciplineId } : {}),
+              ...(metadata?.disciplineName !== undefined ? { disciplineName: metadata.disciplineName } : {}),
               ...(metadata?.certificateUrl !== undefined ? { certificateUrl: metadata.certificateUrl } : {})
             };
             if (fileData.publishedFileDataUrl && fileData.publishedFileDataUrl.length < 700000) {
@@ -2904,6 +2925,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
         abstract: metadata?.abstract || 'Scholarly research contribution published in Contemporary Horizons in Social Sciences and Humanities.',
         keywords: metadata?.keywords || ['Social Sciences', 'Humanities', 'Peer Reviewed'],
         track: metadata?.track || 'Sociology & Social Theory',
+        trackId: metadata?.trackId,
+        disciplineId: metadata?.disciplineId,
+        disciplineName: metadata?.disciplineName,
         authors: metadata?.authors && metadata.authors.length > 0 ? metadata.authors : [{
           id: `auth_${Date.now()}`,
           name: 'Author Name',
@@ -2970,6 +2994,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
             ...(metadata?.authors ? { authors: metadata.authors } : {}),
             ...(metadata?.abstract ? { abstract: metadata.abstract } : {}),
             ...(metadata?.track ? { track: metadata.track } : {}),
+            ...(metadata?.trackId !== undefined ? { trackId: metadata.trackId } : {}),
+            ...(metadata?.disciplineId !== undefined ? { disciplineId: metadata.disciplineId } : {}),
+            ...(metadata?.disciplineName !== undefined ? { disciplineName: metadata.disciplineName } : {}),
             ...(metadata?.volume !== undefined ? { volume: metadata.volume } : {}),
             ...(metadata?.issue !== undefined ? { issue: metadata.issue } : {}),
             ...(metadata?.year !== undefined ? { year: metadata.year } : {}),
@@ -2997,6 +3024,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
               ...(metadata?.authors ? { authors: metadata.authors } : {}),
               ...(metadata?.abstract ? { abstract: metadata.abstract } : {}),
               ...(metadata?.track ? { track: metadata.track } : {}),
+              ...(metadata?.trackId !== undefined ? { trackId: metadata.trackId } : {}),
+              ...(metadata?.disciplineId !== undefined ? { disciplineId: metadata.disciplineId } : {}),
+              ...(metadata?.disciplineName !== undefined ? { disciplineName: metadata.disciplineName } : {}),
               ...(metadata?.volume !== undefined ? { volume: metadata.volume } : {}),
               ...(metadata?.issue !== undefined ? { issue: metadata.issue } : {}),
               ...(metadata?.year !== undefined ? { year: metadata.year } : {}),
@@ -3024,6 +3054,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
     abstract: string;
     keywords: string[];
     track: string;
+    trackId?: string;
+    disciplineId?: string;
+    disciplineName?: string;
     volume: number;
     issue: number;
     year: number;
@@ -3050,6 +3083,9 @@ export const JournalProvider: React.FC<{ children: React.ReactNode }> = ({ child
       abstract: data.abstract.trim(),
       keywords: data.keywords,
       track: data.track,
+      trackId: data.trackId,
+      disciplineId: data.disciplineId,
+      disciplineName: data.disciplineName,
       submissionDate: today,
       status: data.status === 'published' ? 'published' : 'submitted',
       volume: data.volume,

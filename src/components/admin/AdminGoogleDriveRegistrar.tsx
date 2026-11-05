@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useJournal } from '../../context/JournalContext';
-import { Article, Author } from '../../types';
+import { Article, Author, Discipline, SubjectTrack } from '../../types';
 import { parseGoogleDriveUrl, validateGoogleDriveLink } from '../../utils/googleDriveUtils';
 import { generateAcademicDoi } from '../../utils/doiUtils';
 import { GoogleDrivePreviewModal } from '../GoogleDrivePreviewModal';
@@ -31,6 +31,10 @@ import {
 export const AdminGoogleDriveRegistrar: React.FC = () => {
   const {
     articles,
+    disciplines,
+    activeDisciplines,
+    subjectTracks,
+    activeSubjectTracks,
     registerGoogleDrivePaper,
     updateArticle,
     deleteArticle,
@@ -43,16 +47,25 @@ export const AdminGoogleDriveRegistrar: React.FC = () => {
   // Active section inside registrar
   const [activeSection, setActiveSection] = useState<'register' | 'manage' | 'downloads' | 'script'>('register');
 
+  // Dynamic Discipline and Subject Track state
+  const defaultDisc = activeDisciplines[0] || disciplines[0];
+  const [disciplineId, setDisciplineId] = useState<string>(defaultDisc?.id || '');
+  const [disciplineName, setDisciplineName] = useState<string>(defaultDisc?.name || '');
+
+  const defaultTrackObj = activeSubjectTracks.find(t => t.disciplineIds?.includes(defaultDisc?.id || '')) ||
+    activeSubjectTracks[0];
+  const [track, setTrack] = useState<string>(defaultTrackObj?.name || '');
+  const [trackId, setTrackId] = useState<string>(defaultTrackObj?.id || '');
+
   // New paper form state
   const [title, setTitle] = useState('');
   const [authorsInput, setAuthorsInput] = useState('');
   const [abstract, setAbstract] = useState('');
   const [keywordsInput, setKeywordsInput] = useState('');
-  const [track, setTrack] = useState('Critical Humanities & Social Sciences');
   const [volume, setVolume] = useState<number>(7);
   const [issue, setIssue] = useState<number>(1);
   const [year, setYear] = useState<number>(new Date().getFullYear());
-  const [pages, setPages] = useState('1 24');
+  const [pages, setPages] = useState('1–24');
   const [doi, setDoi] = useState('');
   const [driveUrl, setDriveUrl] = useState('');
   const [coverImage, setCoverImage] = useState('');
@@ -98,17 +111,107 @@ export const AdminGoogleDriveRegistrar: React.FC = () => {
   const parsedDrive = parseGoogleDriveUrl(driveUrl);
   const parsedAssetDrive = parseGoogleDriveUrl(assetDriveUrl);
 
+  // Discipline options (Preserve deactivated discipline if previously assigned)
+  const disciplineOptions = useMemo(() => {
+    const list = [...activeDisciplines];
+    if (disciplineId && !list.some(d => d.id === disciplineId)) {
+      const existing = disciplines.find(d => d.id === disciplineId);
+      if (existing) {
+        list.unshift(existing);
+      } else if (disciplineName) {
+        list.unshift({
+          id: disciplineId,
+          name: disciplineName,
+          order: -1,
+          isActive: false
+        });
+      }
+    }
+    return list;
+  }, [activeDisciplines, disciplines, disciplineId, disciplineName]);
+
+  // Subject track options dynamically filtered by selected discipline
+  const trackOptions = useMemo(() => {
+    if (!disciplineId) return [];
+
+    const filtered = activeSubjectTracks.filter(t => t.disciplineIds?.includes(disciplineId));
+
+    if (track) {
+      const isPresent = filtered.some(t => t.name.toLowerCase() === track.toLowerCase());
+      if (!isPresent) {
+        const foundInAll = subjectTracks.find(t =>
+          t.disciplineIds?.includes(disciplineId) &&
+          (t.name.toLowerCase() === track.toLowerCase() || t.id === trackId)
+        );
+        if (foundInAll) {
+          return [foundInAll, ...filtered];
+        } else {
+          return [
+            {
+              id: trackId || 'preserved-track',
+              name: track,
+              disciplineIds: [disciplineId],
+              order: -1,
+              isActive: false
+            } as SubjectTrack,
+            ...filtered
+          ];
+        }
+      }
+    }
+    return filtered;
+  }, [disciplineId, activeSubjectTracks, subjectTracks, track, trackId]);
+
+  // Cascading discipline change
+  const handleDisciplineChange = (newDisciplineId: string) => {
+    const selectedDisc = disciplines.find(d => d.id === newDisciplineId);
+    setDisciplineId(newDisciplineId);
+    setDisciplineName(selectedDisc?.name || '');
+
+    const available = activeSubjectTracks.filter(t => t.disciplineIds?.includes(newDisciplineId));
+    if (available.length > 0) {
+      setTrack(available[0].name);
+      setTrackId(available[0].id);
+    } else {
+      const anyTracks = subjectTracks.filter(t => t.disciplineIds?.includes(newDisciplineId));
+      if (anyTracks.length > 0) {
+        setTrack(anyTracks[0].name);
+        setTrackId(anyTracks[0].id);
+      } else {
+        setTrack('');
+        setTrackId('');
+      }
+    }
+  };
+
+  const handleTrackChange = (selectedTrackName: string) => {
+    setTrack(selectedTrackName);
+    const matched = subjectTracks.find(t => t.name === selectedTrackName);
+    if (matched) {
+      setTrackId(matched.id);
+    }
+  };
+
   const resetForm = () => {
     setTitle('');
     setAuthorsInput('');
     setAbstract('');
     setKeywordsInput('');
-    setPages('1 24');
+    setPages('1–24');
     setDoi('');
     setDriveUrl('');
     setCoverImage('');
     setStatus('published');
     setEditingArticleId(null);
+
+    const initDisc = activeDisciplines[0] || disciplines[0];
+    const initDiscId = initDisc?.id || '';
+    setDisciplineId(initDiscId);
+    setDisciplineName(initDisc?.name || '');
+
+    const initTrack = activeSubjectTracks.find(t => t.disciplineIds?.includes(initDiscId)) || activeSubjectTracks[0];
+    setTrack(initTrack?.name || '');
+    setTrackId(initTrack?.id || '');
   };
 
   const handleAutoDoi = () => {
@@ -185,11 +288,14 @@ export const AdminGoogleDriveRegistrar: React.FC = () => {
             authors: parsedAuthors,
             abstract: abstract.trim(),
             keywords: parsedKeywords.length ? parsedKeywords : ['Research Article'],
+            disciplineId: disciplineId || undefined,
+            disciplineName: disciplineName || undefined,
+            trackId: trackId || undefined,
             track,
             volume,
             issue,
             year,
-            pages: pages.trim() || '1 24',
+            pages: pages.trim() || '1–24',
             doi: doi.trim() || undefined,
             driveUrl: driveUrl.trim(),
             driveFileId: driveVal.fileId,
@@ -210,11 +316,14 @@ export const AdminGoogleDriveRegistrar: React.FC = () => {
           authors: parsedAuthors,
           abstract: abstract.trim() || 'Peer-reviewed research paper published in Contemporary Horizons in Social Sciences and Humanities.',
           keywords: parsedKeywords.length ? parsedKeywords : ['Peer-Reviewed Research', 'Open Access', 'CHSSH'],
+          disciplineId: disciplineId || undefined,
+          disciplineName: disciplineName || undefined,
+          trackId: trackId || undefined,
           track,
           volume,
           issue,
           year,
-          pages: pages.trim() || '1 24',
+          pages: pages.trim() || '1–24',
           doi: doi.trim() || undefined,
           driveUrl: driveUrl.trim(),
           coverImage: coverImage.trim() || undefined,
@@ -239,11 +348,32 @@ export const AdminGoogleDriveRegistrar: React.FC = () => {
     setAuthorsInput(art.authors.map(a => `${a.name}, ${a.affiliation}, ${a.country}${a.email ? `, ${a.email}` : ''}`).join('\n'));
     setAbstract(art.abstract || '');
     setKeywordsInput(art.keywords?.join(', ') || '');
-    setTrack(art.track || 'Critical Humanities & Social Sciences');
+
+    // Resolve discipline
+    let resolvedDiscId = art.disciplineId || '';
+    let resolvedDiscName = art.disciplineName || '';
+    if (!resolvedDiscId && (art.trackId || art.track)) {
+      const matched = art.trackId
+        ? subjectTracks.find(t => t.id === art.trackId)
+        : subjectTracks.find(t => t.name.toLowerCase() === (art.track || '').toLowerCase());
+      if (matched && matched.disciplineIds && matched.disciplineIds.length > 0) {
+        resolvedDiscId = matched.disciplineIds[0];
+        resolvedDiscName = disciplines.find(d => d.id === resolvedDiscId)?.name || '';
+      }
+    }
+    if (!resolvedDiscId) {
+      resolvedDiscId = activeDisciplines[0]?.id || disciplines[0]?.id || '';
+      resolvedDiscName = activeDisciplines[0]?.name || disciplines[0]?.name || '';
+    }
+    setDisciplineId(resolvedDiscId);
+    setDisciplineName(resolvedDiscName);
+    setTrack(art.track || '');
+    setTrackId(art.trackId || '');
+
     setVolume(art.volume || 7);
     setIssue(art.issue || 1);
     setYear(art.year || 2026);
-    setPages(art.pages || '1 24');
+    setPages(art.pages || '1–24');
     setDoi(art.doi || '');
     setDriveUrl(art.driveUrl || (art.driveFileId ? `https://drive.google.com/file/d/${art.driveFileId}/view` : ''));
     setCoverImage(art.coverImage || '');
@@ -713,8 +843,8 @@ function registerDocumentRecord(docId, data) {
               </div>
             </div>
 
-            {/* 3. Issue, Volume, DOI, & Track */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            {/* 3. Issue, Volume, & DOI */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
                   Volume / Issue / Year
@@ -753,7 +883,7 @@ function registerDocumentRecord(docId, data) {
                   type="text"
                   value={pages}
                   onChange={(e) => setPages(e.target.value)}
-                  placeholder="e.g. 1 24"
+                  placeholder="e.g. 1–24"
                   className="w-full text-xs px-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-lg"
                 />
               </div>
@@ -780,23 +910,58 @@ function registerDocumentRecord(docId, data) {
                   className="w-full text-xs font-mono px-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-lg"
                 />
               </div>
+            </div>
+
+            {/* Dynamic Discipline & Subject Track Cascading Selector */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-stone-50 dark:bg-stone-850 p-3 rounded-xl border border-stone-200 dark:border-stone-800">
+              <div>
+                <label htmlFor="paper-discipline-select" className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1 flex items-center justify-between">
+                  <span>Academic Discipline *</span>
+                  <span className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200/50 dark:border-emerald-800/40">
+                    Firestore Dynamic
+                  </span>
+                </label>
+                <select
+                  id="paper-discipline-select"
+                  value={disciplineId}
+                  onChange={(e) => handleDisciplineChange(e.target.value)}
+                  className="w-full text-xs px-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-lg cursor-pointer"
+                >
+                  {disciplineOptions.length === 0 ? (
+                    <option value="">No active disciplines found</option>
+                  ) : (
+                    disciplineOptions.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}{!d.isActive ? ' (Archived / Inactive)' : ''}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
 
               <div>
-                <label htmlFor="paper-track-select" className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-                  Subject Track
+                <label htmlFor="paper-track-select" className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1 flex items-center justify-between">
+                  <span>Subject Track / Domain *</span>
+                  <span className="text-[10px] font-normal text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-200/50 dark:border-sky-800/40">
+                    {trackOptions.length} available
+                  </span>
                 </label>
                 <select
                   id="paper-track-select"
                   value={track}
-                  onChange={(e) => setTrack(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-lg"
+                  onChange={(e) => handleTrackChange(e.target.value)}
+                  disabled={trackOptions.length === 0}
+                  className="w-full text-xs px-3 py-2 bg-white dark:bg-stone-900 border border-stone-300 dark:border-stone-700 rounded-lg cursor-pointer disabled:opacity-60"
                 >
-                  <option value="Critical Humanities & Social Sciences">Critical Humanities & Social Sciences</option>
-                  <option value="Anthropology, Sociology & Cultural Studies">Anthropology, Sociology & Cultural Studies</option>
-                  <option value="Political Theory, Governance & Human Rights">Political Theory, Governance & Human Rights</option>
-                  <option value="Philosophy, Ethics & Intellectual History">Philosophy, Ethics & Intellectual History</option>
-                  <option value="Media, Communications & Digital Culture">Media, Communications & Digital Culture</option>
-                  <option value="Literary Criticism & Comparative Literature">Literary Criticism & Comparative Literature</option>
+                  {trackOptions.length === 0 ? (
+                    <option value="">No tracks linked to this discipline</option>
+                  ) : (
+                    trackOptions.map(t => (
+                      <option key={t.id || t.name} value={t.name}>
+                        {t.name}{!t.isActive ? ' (Preserved / Inactive)' : ''}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useJournal } from '../../context/JournalContext';
-import { Article } from '../../types';
+import { Article, Discipline, SubjectTrack } from '../../types';
 import { parseGoogleDriveUrl, validateGoogleDriveLink } from '../../utils/googleDriveUtils';
 import { generateAcademicDoi, normalizeDoi, getCanonicalDoiUrl } from '../../utils/doiUtils';
 import {
@@ -36,12 +36,15 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
   const {
     isAdmin,
     articles,
+    disciplines,
+    activeDisciplines,
+    subjectTracks,
+    activeSubjectTracks,
     attachGoogleDrivePaper,
     updateArticle,
     content,
     setActiveTab,
-    downloadPublishedPaper,
-    activeSubjectTracks
+    downloadPublishedPaper
   } = useJournal();
 
   const [selectedArticleId, setSelectedArticleId] = useState<string>(
@@ -54,7 +57,13 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
   const [authorName, setAuthorName] = useState<string>('');
   const [affiliation, setAffiliation] = useState<string>('');
   const [authorEmail, setAuthorEmail] = useState<string>('');
-  const [track, setTrack] = useState<string>('Sociology & Social Theory');
+
+  // Dynamic Discipline and Subject Track state
+  const [disciplineId, setDisciplineId] = useState<string>('');
+  const [disciplineName, setDisciplineName] = useState<string>('');
+  const [track, setTrack] = useState<string>('');
+  const [trackId, setTrackId] = useState<string>('');
+
   const [volume, setVolume] = useState<number>(7);
   const [issue, setIssue] = useState<number>(1);
   const [year, setYear] = useState<number>(2026);
@@ -74,21 +83,8 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
   const isCreatingNew = selectedArticleId === 'new';
   const targetArticle = isCreatingNew ? null : articles.find(a => a.id === selectedArticleId);
 
-  if (!isAdmin) return null;
-
   // Parse Drive URL in real-time
   const parsedDrive = parseGoogleDriveUrl(driveUrl);
-
-  const tracks = activeSubjectTracks.length > 0
-    ? activeSubjectTracks.map((t) => t.name)
-    : [
-        'Sociology & Social Theory',
-        'Cultural Studies & Critical Theory',
-        'Applied Ethics & Epistemic Justice',
-        'History, Memory & Archival Studies',
-        'Political Philosophy & Global Governance',
-        'Digital Humanities & Computational Social Science'
-      ];
 
   // Pre-fill form when target article changes
   useEffect(() => {
@@ -98,7 +94,44 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
       setAuthorName(targetArticle.authors.map(a => a.name).join(', ') || '');
       setAffiliation(targetArticle.authors[0]?.affiliation || '');
       setAuthorEmail(targetArticle.authors[0]?.email || '');
-      setTrack(targetArticle.track || 'Sociology & Social Theory');
+
+      // Resolve discipline dynamically
+      let resolvedDiscId = targetArticle.disciplineId || '';
+      let resolvedDiscName = targetArticle.disciplineName || '';
+
+      if (!resolvedDiscId && (targetArticle.trackId || targetArticle.track)) {
+        const matchedTrack = targetArticle.trackId
+          ? subjectTracks.find(t => t.id === targetArticle.trackId)
+          : subjectTracks.find(t => t.name.toLowerCase() === (targetArticle.track || '').toLowerCase());
+        
+        if (matchedTrack && matchedTrack.disciplineIds && matchedTrack.disciplineIds.length > 0) {
+          resolvedDiscId = matchedTrack.disciplineIds[0];
+          const matchedDisc = disciplines.find(d => d.id === resolvedDiscId);
+          resolvedDiscName = matchedDisc?.name || '';
+        }
+      }
+
+      if (!resolvedDiscId) {
+        const fallbackDisc = activeDisciplines[0] || disciplines[0];
+        resolvedDiscId = fallbackDisc?.id || '';
+        resolvedDiscName = fallbackDisc?.name || '';
+      } else if (!resolvedDiscName) {
+        const found = disciplines.find(d => d.id === resolvedDiscId);
+        resolvedDiscName = found?.name || '';
+      }
+
+      setDisciplineId(resolvedDiscId);
+      setDisciplineName(resolvedDiscName);
+
+      // Track resolution
+      const resolvedTrack = targetArticle.track || '';
+      const matchedTrackObj = targetArticle.trackId
+        ? subjectTracks.find(t => t.id === targetArticle.trackId)
+        : subjectTracks.find(t => t.name.toLowerCase() === resolvedTrack.toLowerCase());
+
+      setTrack(resolvedTrack || matchedTrackObj?.name || '');
+      setTrackId(targetArticle.trackId || matchedTrackObj?.id || '');
+
       setVolume(targetArticle.volume || 7);
       setIssue(targetArticle.issue || 1);
       setYear(targetArticle.year || 2026);
@@ -123,7 +156,21 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
       setAuthorName('');
       setAffiliation('');
       setAuthorEmail('');
-      setTrack('Sociology & Social Theory');
+
+      // New paper defaults
+      const defaultDisc = activeDisciplines[0] || disciplines[0];
+      const defaultDiscId = defaultDisc?.id || '';
+      const defaultDiscName = defaultDisc?.name || '';
+      setDisciplineId(defaultDiscId);
+      setDisciplineName(defaultDiscName);
+
+      const defaultTrackObj = activeSubjectTracks.find(t => t.disciplineIds?.includes(defaultDiscId)) ||
+        subjectTracks.find(t => t.disciplineIds?.includes(defaultDiscId)) ||
+        activeSubjectTracks[0];
+
+      setTrack(defaultTrackObj?.name || '');
+      setTrackId(defaultTrackObj?.id || '');
+
       setVolume(7);
       setIssue(1);
       setYear(2026);
@@ -134,7 +181,88 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
       setAbstract('');
       setErrorMessage(null);
     }
-  }, [selectedArticleId, targetArticle?.id]);
+  }, [selectedArticleId, targetArticle?.id, disciplines, activeDisciplines, subjectTracks, activeSubjectTracks]);
+
+  // Discipline options (Preserve deactivated discipline if previously assigned)
+  const disciplineOptions = useMemo(() => {
+    const list = [...activeDisciplines];
+    if (disciplineId && !list.some(d => d.id === disciplineId)) {
+      const existing = disciplines.find(d => d.id === disciplineId);
+      if (existing) {
+        list.unshift(existing);
+      } else if (disciplineName) {
+        list.unshift({
+          id: disciplineId,
+          name: disciplineName,
+          order: -1,
+          isActive: false
+        });
+      }
+    }
+    return list;
+  }, [activeDisciplines, disciplines, disciplineId, disciplineName]);
+
+  // Subject track options dynamically filtered by selected discipline
+  const trackOptions = useMemo(() => {
+    if (!disciplineId) return [];
+
+    const filtered = activeSubjectTracks.filter(t => t.disciplineIds?.includes(disciplineId));
+
+    if (track) {
+      const isPresent = filtered.some(t => t.name.toLowerCase() === track.toLowerCase());
+      if (!isPresent) {
+        const foundInAll = subjectTracks.find(t =>
+          t.disciplineIds?.includes(disciplineId) &&
+          (t.name.toLowerCase() === track.toLowerCase() || t.id === trackId)
+        );
+        if (foundInAll) {
+          return [foundInAll, ...filtered];
+        } else if (targetArticle && (targetArticle.track === track || targetArticle.trackId === trackId)) {
+          return [
+            {
+              id: trackId || 'preserved-track',
+              name: track,
+              disciplineIds: [disciplineId],
+              order: -1,
+              isActive: false
+            } as SubjectTrack,
+            ...filtered
+          ];
+        }
+      }
+    }
+    return filtered;
+  }, [disciplineId, activeSubjectTracks, subjectTracks, track, trackId, targetArticle]);
+
+  // Cascading discipline change
+  const handleDisciplineChange = (newDisciplineId: string) => {
+    const selectedDisc = disciplines.find(d => d.id === newDisciplineId);
+    setDisciplineId(newDisciplineId);
+    setDisciplineName(selectedDisc?.name || '');
+
+    const available = activeSubjectTracks.filter(t => t.disciplineIds?.includes(newDisciplineId));
+    if (available.length > 0) {
+      setTrack(available[0].name);
+      setTrackId(available[0].id);
+    } else {
+      const anyTracks = subjectTracks.filter(t => t.disciplineIds?.includes(newDisciplineId));
+      if (anyTracks.length > 0) {
+        setTrack(anyTracks[0].name);
+        setTrackId(anyTracks[0].id);
+      } else {
+        setTrack('');
+        setTrackId('');
+      }
+    }
+  };
+
+  const handleTrackChange = (selectedTrackName: string) => {
+    setTrack(selectedTrackName);
+    const matched = subjectTracks.find(t => t.name === selectedTrackName);
+    if (matched) {
+      setTrackId(matched.id);
+    }
+  };
 
   const handleAutoDoi = () => {
     const autoDoi = generateAcademicDoi(content.doi_prefix, {
@@ -202,8 +330,9 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
           isCorresponding: true
         }],
         track,
-        trackId: activeSubjectTracks.find(t => t.name === track)?.id,
-        disciplineId: activeSubjectTracks.find(t => t.name === track)?.disciplineIds?.[0],
+        trackId: trackId || undefined,
+        disciplineId: disciplineId || undefined,
+        disciplineName: disciplineName || undefined,
         volume: Number(volume) || 7,
         issue: Number(issue) || 1,
         year: Number(year) || 2026,
@@ -476,17 +605,51 @@ export const AdminGoogleDrivePaperUpload: React.FC<AdminGoogleDrivePaperUploadPr
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-                Disciplinary Track
+              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1 flex items-center justify-between">
+                <span>Academic Discipline *</span>
+                <span className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200/50 dark:border-emerald-800/40">
+                  Firestore Dynamic
+                </span>
+              </label>
+              <select
+                value={disciplineId}
+                onChange={(e) => handleDisciplineChange(e.target.value)}
+                className="w-full text-xs px-3 py-2 bg-stone-50 dark:bg-stone-850 border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer font-medium"
+              >
+                {disciplineOptions.length === 0 ? (
+                  <option value="">No active disciplines found</option>
+                ) : (
+                  disciplineOptions.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}{!d.isActive ? ' (Archived / Inactive)' : ''}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1 flex items-center justify-between">
+                <span>Subject Track / Domain *</span>
+                <span className="text-[10px] font-normal text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-200/50 dark:border-sky-800/40">
+                  {trackOptions.length} available
+                </span>
               </label>
               <select
                 value={track}
-                onChange={(e) => setTrack(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-stone-50 dark:bg-stone-850 border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                onChange={(e) => handleTrackChange(e.target.value)}
+                disabled={trackOptions.length === 0}
+                className="w-full text-xs px-3 py-2 bg-stone-50 dark:bg-stone-850 border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer font-medium disabled:opacity-60"
               >
-                {tracks.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
+                {trackOptions.length === 0 ? (
+                  <option value="">No tracks linked to this discipline</option>
+                ) : (
+                  trackOptions.map(t => (
+                    <option key={t.id || t.name} value={t.name}>
+                      {t.name}{!t.isActive ? ' (Preserved / Inactive)' : ''}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 

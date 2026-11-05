@@ -237,11 +237,18 @@ export const SubmitManuscript: React.FC = () => {
     setError(null);
 
     try {
+      const matchedTrackObj = activeSubjectTracks.find(t => t.name === track);
+      const parentDiscId = matchedTrackObj?.disciplineIds?.[0];
+      const parentDisc = parentDiscId ? disciplines.find(d => d.id === parentDiscId) : undefined;
+
       const newArticle = submitManuscript({
         title: title.trim(),
         abstract: abstract.trim(),
         keywords,
         track,
+        trackId: matchedTrackObj?.id,
+        disciplineId: parentDisc?.id,
+        disciplineName: parentDisc?.name,
         authors,
         fileName: uploadedFile?.name,
         fileSize: uploadedFile?.size,

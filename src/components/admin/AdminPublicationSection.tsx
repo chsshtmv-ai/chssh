@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useJournal } from '../../context/JournalContext';
-import { Article } from '../../types';
+import { Article, Discipline, SubjectTrack } from '../../types';
 import {
   generateAcademicDoi,
   validateAcademicDoi,
@@ -35,7 +35,8 @@ import {
   Calendar,
   User,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 
 interface AdminPublicationSectionProps {
@@ -49,6 +50,10 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
     isAdmin,
     content,
     articles,
+    disciplines,
+    activeDisciplines,
+    subjectTracks,
+    activeSubjectTracks,
     updateArticle,
     updateArticleCertificate,
     uploadPublishedPaper,
@@ -56,8 +61,7 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
     downloadPublishedPaper,
     viewPublishedPaper,
     downloadOriginalManuscript,
-    setSelectedArticleForView,
-    activeSubjectTracks
+    setSelectedArticleForView
   } = useJournal();
 
   const [selectedArticleId, setSelectedArticleId] = useState<string>(
@@ -78,7 +82,13 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
   const [formAuthorName, setFormAuthorName] = useState<string>('');
   const [formAffiliation, setFormAffiliation] = useState<string>('');
   const [formAuthorEmail, setFormAuthorEmail] = useState<string>('');
-  const [formTrack, setFormTrack] = useState<string>('Sociology & Social Theory');
+  
+  // Dynamic Discipline and Subject Track States (Firestore single source of truth)
+  const [formDisciplineId, setFormDisciplineId] = useState<string>('');
+  const [formDisciplineName, setFormDisciplineName] = useState<string>('');
+  const [formTrack, setFormTrack] = useState<string>('');
+  const [formTrackId, setFormTrackId] = useState<string>('');
+
   const [formVolume, setFormVolume] = useState<number>(7);
   const [formIssue, setFormIssue] = useState<number>(1);
   const [formYear, setFormYear] = useState<number>(2026);
@@ -95,20 +105,6 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
   const isCreatingNew = selectedArticleId === 'new';
   const targetArticle = isCreatingNew ? null : articles.find(a => a.id === selectedArticleId);
 
-  if (!isAdmin) return null;
-
-  // Dynamic Tracks list
-  const tracks = activeSubjectTracks.length > 0
-    ? activeSubjectTracks.map((t) => t.name)
-    : [
-        'Sociology & Social Theory',
-        'Cultural Studies & Critical Theory',
-        'Applied Ethics & Epistemic Justice',
-        'History, Memory & Archival Studies',
-        'Political Philosophy & Global Governance',
-        'Digital Humanities & Computational Social Science'
-      ];
-
   // Sync form inputs when selectedArticleId or targetArticle changes
   useEffect(() => {
     if (targetArticle) {
@@ -116,7 +112,46 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
       setFormAuthorName(targetArticle.authors.map(a => a.name).join(', ') || '');
       setFormAffiliation(targetArticle.authors[0]?.affiliation || '');
       setFormAuthorEmail(targetArticle.authors[0]?.email || '');
-      setFormTrack(targetArticle.track || 'Sociology & Social Theory');
+
+      // Resolve discipline dynamically from targetArticle or subjectTracks
+      let resolvedDiscId = targetArticle.disciplineId || '';
+      let resolvedDiscName = targetArticle.disciplineName || '';
+
+      // If not stored explicitly, look up parent discipline via trackId or track name
+      if (!resolvedDiscId && (targetArticle.trackId || targetArticle.track)) {
+        const matchedTrack = targetArticle.trackId
+          ? subjectTracks.find(t => t.id === targetArticle.trackId)
+          : subjectTracks.find(t => t.name.toLowerCase() === (targetArticle.track || '').toLowerCase());
+        
+        if (matchedTrack && matchedTrack.disciplineIds && matchedTrack.disciplineIds.length > 0) {
+          resolvedDiscId = matchedTrack.disciplineIds[0];
+          const matchedDisc = disciplines.find(d => d.id === resolvedDiscId);
+          resolvedDiscName = matchedDisc?.name || '';
+        }
+      }
+
+      // If still no discipline match, fallback to first active discipline
+      if (!resolvedDiscId) {
+        const fallbackDisc = activeDisciplines[0] || disciplines[0];
+        resolvedDiscId = fallbackDisc?.id || '';
+        resolvedDiscName = fallbackDisc?.name || '';
+      } else if (!resolvedDiscName) {
+        const found = disciplines.find(d => d.id === resolvedDiscId);
+        resolvedDiscName = found?.name || '';
+      }
+
+      setFormDisciplineId(resolvedDiscId);
+      setFormDisciplineName(resolvedDiscName);
+
+      // Track resolution
+      const resolvedTrack = targetArticle.track || '';
+      const matchedTrackObj = targetArticle.trackId
+        ? subjectTracks.find(t => t.id === targetArticle.trackId)
+        : subjectTracks.find(t => t.name.toLowerCase() === resolvedTrack.toLowerCase());
+      
+      setFormTrack(resolvedTrack || matchedTrackObj?.name || '');
+      setFormTrackId(targetArticle.trackId || matchedTrackObj?.id || '');
+
       setFormVolume(targetArticle.volume || 7);
       setFormIssue(targetArticle.issue || 1);
       setFormYear(targetArticle.year || 2026);
@@ -142,7 +177,21 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
       setFormAuthorName('');
       setFormAffiliation('');
       setFormAuthorEmail('');
-      setFormTrack('Sociology & Social Theory');
+
+      // New paper defaults to first active discipline and its first active track
+      const defaultDisc = activeDisciplines[0] || disciplines[0];
+      const defaultDiscId = defaultDisc?.id || '';
+      const defaultDiscName = defaultDisc?.name || '';
+      setFormDisciplineId(defaultDiscId);
+      setFormDisciplineName(defaultDiscName);
+
+      const defaultTrackObj = activeSubjectTracks.find(t => t.disciplineIds?.includes(defaultDiscId)) ||
+        subjectTracks.find(t => t.disciplineIds?.includes(defaultDiscId)) ||
+        activeSubjectTracks[0];
+      
+      setFormTrack(defaultTrackObj?.name || '');
+      setFormTrackId(defaultTrackObj?.id || '');
+
       setFormVolume(7);
       setFormIssue(1);
       setFormYear(2026);
@@ -155,7 +204,92 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
       setFileValidationInfo(null);
       setErrorMsg(null);
     }
-  }, [selectedArticleId, targetArticle?.id]);
+  }, [selectedArticleId, targetArticle?.id, disciplines, activeDisciplines, subjectTracks, activeSubjectTracks]);
+
+  // Discipline options (Preserve deactivated discipline if previously assigned)
+  const disciplineOptions = useMemo(() => {
+    const list = [...activeDisciplines];
+    if (formDisciplineId && !list.some(d => d.id === formDisciplineId)) {
+      const existing = disciplines.find(d => d.id === formDisciplineId);
+      if (existing) {
+        list.unshift(existing);
+      } else if (formDisciplineName) {
+        list.unshift({
+          id: formDisciplineId,
+          name: formDisciplineName,
+          order: -1,
+          isActive: false
+        });
+      }
+    }
+    return list;
+  }, [activeDisciplines, disciplines, formDisciplineId, formDisciplineName]);
+
+  // Subject track options dynamically filtered by selected discipline
+  const trackOptions = useMemo(() => {
+    if (!formDisciplineId) return [];
+
+    // Active tracks linked to this discipline
+    const filtered = activeSubjectTracks.filter(t => t.disciplineIds?.includes(formDisciplineId));
+
+    // If the paper's current track is assigned to this discipline but inactive, preserve it
+    if (formTrack) {
+      const isPresent = filtered.some(t => t.name.toLowerCase() === formTrack.toLowerCase());
+      if (!isPresent) {
+        const foundInAll = subjectTracks.find(t =>
+          t.disciplineIds?.includes(formDisciplineId) &&
+          (t.name.toLowerCase() === formTrack.toLowerCase() || t.id === formTrackId)
+        );
+        if (foundInAll) {
+          return [foundInAll, ...filtered];
+        } else if (targetArticle && (targetArticle.track === formTrack || targetArticle.trackId === formTrackId)) {
+          // Historical preserved value
+          return [
+            {
+              id: formTrackId || 'preserved-track',
+              name: formTrack,
+              disciplineIds: [formDisciplineId],
+              order: -1,
+              isActive: false
+            } as SubjectTrack,
+            ...filtered
+          ];
+        }
+      }
+    }
+    return filtered;
+  }, [formDisciplineId, activeSubjectTracks, subjectTracks, formTrack, formTrackId, targetArticle]);
+
+  // Handle parent discipline change: automatically refreshes child tracks
+  const handleDisciplineChange = (newDisciplineId: string) => {
+    const selectedDisc = disciplines.find(d => d.id === newDisciplineId);
+    setFormDisciplineId(newDisciplineId);
+    setFormDisciplineName(selectedDisc?.name || '');
+
+    // Refresh track options for newly selected discipline
+    const available = activeSubjectTracks.filter(t => t.disciplineIds?.includes(newDisciplineId));
+    if (available.length > 0) {
+      setFormTrack(available[0].name);
+      setFormTrackId(available[0].id);
+    } else {
+      const anyTracks = subjectTracks.filter(t => t.disciplineIds?.includes(newDisciplineId));
+      if (anyTracks.length > 0) {
+        setFormTrack(anyTracks[0].name);
+        setFormTrackId(anyTracks[0].id);
+      } else {
+        setFormTrack('');
+        setFormTrackId('');
+      }
+    }
+  };
+
+  const handleTrackChange = (selectedTrackName: string) => {
+    setFormTrack(selectedTrackName);
+    const matched = subjectTracks.find(t => t.name === selectedTrackName);
+    if (matched) {
+      setFormTrackId(matched.id);
+    }
+  };
 
   const handleAutoGenerateDoi = () => {
     const autoDoi = generateAcademicDoi(content.doi_prefix, {
@@ -275,6 +409,9 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
           country: 'India',
           isCorresponding: true
         }],
+        disciplineId: formDisciplineId || undefined,
+        disciplineName: formDisciplineName || undefined,
+        trackId: formTrackId || undefined,
         track: formTrack,
         volume: Number(formVolume) || 7,
         issue: Number(formIssue) || 1,
@@ -576,17 +713,51 @@ export const AdminPublicationSection: React.FC<AdminPublicationSectionProps> = (
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1">
-                Disciplinary Track
+              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1 flex items-center justify-between">
+                <span>Academic Discipline *</span>
+                <span className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200/50 dark:border-emerald-800/40">
+                  Firestore Dynamic
+                </span>
+              </label>
+              <select
+                value={formDisciplineId}
+                onChange={(e) => handleDisciplineChange(e.target.value)}
+                className="w-full text-xs px-3 py-2 bg-stone-50 dark:bg-stone-850 border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer font-medium"
+              >
+                {disciplineOptions.length === 0 ? (
+                  <option value="">No active disciplines found</option>
+                ) : (
+                  disciplineOptions.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}{!d.isActive ? ' (Archived / Inactive)' : ''}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 mb-1 flex items-center justify-between">
+                <span>Subject Track / Domain *</span>
+                <span className="text-[10px] font-normal text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/60 px-1.5 py-0.5 rounded border border-sky-200/50 dark:border-sky-800/40">
+                  {trackOptions.length} available
+                </span>
               </label>
               <select
                 value={formTrack}
-                onChange={(e) => setFormTrack(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-stone-50 dark:bg-stone-850 border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer"
+                onChange={(e) => handleTrackChange(e.target.value)}
+                disabled={trackOptions.length === 0}
+                className="w-full text-xs px-3 py-2 bg-stone-50 dark:bg-stone-850 border border-stone-300 dark:border-stone-700 text-stone-900 dark:text-stone-100 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer font-medium disabled:opacity-60"
               >
-                {tracks.map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
+                {trackOptions.length === 0 ? (
+                  <option value="">No tracks linked to this discipline</option>
+                ) : (
+                  trackOptions.map(t => (
+                    <option key={t.id || t.name} value={t.name}>
+                      {t.name}{!t.isActive ? ' (Preserved / Inactive)' : ''}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
